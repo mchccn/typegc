@@ -46,8 +46,8 @@ namespace Parser {
           };
 }
 
-type Constraint = (value: any) => boolean | Error;
-type Factory = ((...args: any[]) => Constraint) & { isFactory: true };
+type Constraint = ((value: any) => boolean | Error) & { js: string; };
+type Factory = ((...args: any[]) => Constraint) & { isFactory: true } & { js: string; };
 type ConstraintOrFactory = Constraint | Factory;
 
 class Tokenizer {
@@ -401,15 +401,39 @@ class Resolver {
                 [
                     "range",
                     (start: number, stop?: number, step?: number) => {
-                        return (v: number | string) => {
-                            if (start && stop && step) {
+                        return Object.assign((v: number | string) => {
+                            if (typeof start === "number" && typeof stop === "number" && typeof step === "number") {
                                 if (typeof v === "string") return new RangeError(`String values cannot use the step parameter for the range factory.`);
 
-                                // finish this and other built-in factories
+                                if (stop <= start) return new RangeError(`Stop parameter must be greater than the start parameter in the range factory.`);
+
+                                if (step <= 0) return new RangeError(`Step parameter for the range factory must be positive.`);
+
+                                return v >= start && v <= stop && ((v - start) % step) === 0;
                             }
 
-                            return true;
-                        };
+                            if (typeof start === "number" && typeof stop === "number") {
+                                if (stop <= start) return new RangeError(`Stop parameter must be greater than the start parameter in the range factory.`);
+
+                                if (typeof v === "string") return v.length >= start && v.length <= stop;
+
+                                return v >= start && v <= stop;
+                            }
+
+                            if (typeof start === "number") {
+                                if (start < 0) {
+                                    if (typeof v === "string") throw new RangeError(`String values cannot use a negative end parameter in the range factory.`);
+
+                                    return v >= start;
+                                }
+
+                                return typeof v === "string" ? v.length <= start : v <= start && v >= 0;
+                            }
+
+                            throw new RangeError(`Expected 1-3 arguments for the range factory, got none.`);
+                        }, {
+                            js: `() => {}`, // ! Add range factory JS (instead of checking parameters per function call, check parameters, then return different functions based on the parameters to make it easier to write the JS for the range factory)
+                        });
                     },
                 ],
                 [
@@ -419,16 +443,16 @@ class Resolver {
 
                         const regex = new RegExp(pattern, flags);
 
-                        return (v: string) => regex.test(v);
+                        return Object.assign((v: string) => regex.test(v), { js: `(v) => new RegExp("${pattern.replaceAll('"', '\\"')}").test(v)` });
                     },
                 ],
-            ].map(([key, value]) => [key, Object.assign(value, { isFactory: true })] as [string, Factory])
+            ].map(([key, value]) => [key, Object.assign(value, { js: value.toString(), isFactory: true })] as [string, Factory])
         ),
         primitives: new Map<string, Constraint>([
             ["string", (v: any) => typeof v === "string"],
             ["number", (v: any) => typeof v === "number"],
             ["boolean", (v: any) => typeof v === "boolean"],
-        ]),
+        ].map(([key, value]) => [key, Object.assign(value, { js: value.toString() })] as [string, Constraint])),
     };
 
     private readonly resolved = {
@@ -496,26 +520,30 @@ class Resolver {
                     if (token.type === "IDENTIFIER") resolved.push(...this.identifier(token, body));
                 }
 
-                constraints.push((v: any) =>
+                constraints.push(Object.assign((v: any) =>
                     resolved.every((fn) => {
                         const e = fn(v[prop.value]);
 
                         if (e instanceof Error) throw e;
 
                         return e;
+                    }), {
+                        js: `(v) => [${resolved.map((fn) => "(" + fn.js + ")").join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
                     })
                 );
             });
 
-            return void this.resolved.defs.set(struct.name, (v: any) =>
+            return void this.resolved.defs.set(struct.name, Object.assign((v: any) =>
                 constraints.every((fn) => {
                     const e = fn(v);
 
                     if (e instanceof Error) throw e;
 
                     return e;
-                })
-            );
+                }), {
+                    js: `(v) => [${constraints.map((fn) => "(" + fn.js + ")").join(", ")}].every((fn) => wrap(fn(v)))`,
+                }
+            ));
         }
 
         if (struct.type === "MODEL") {
@@ -532,26 +560,30 @@ class Resolver {
                     if (token.type === "IDENTIFIER") resolved.push(...this.identifier(token, body));
                 }
 
-                constraints.push((v: any) =>
+                constraints.push(Object.assign((v: any) =>
                     resolved.every((fn) => {
                         const e = fn(v[prop.value]);
 
                         if (e instanceof Error) throw e;
 
                         return e;
+                    }), {
+                        js: `(v) => [${resolved.map((fn) => "(" + fn.js + ")").join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
                     })
                 );
             });
 
-            return void this.resolved.models.set(struct.name, (v: any) =>
+            return void this.resolved.models.set(struct.name, Object.assign((v: any) =>
                 constraints.every((fn) => {
                     const e = fn(v);
 
                     if (e instanceof Error) throw e;
 
                     return e;
-                })
-            );
+                }), {
+                    js: `(v) => [${constraints.map((fn) => "(" + fn.js + ")").join(", ")}].every((fn) => wrap(fn(v)))`,
+                }
+            ));
         }
 
         throw new Error(`Struct type not handled properly: '${struct.type}'.`);
@@ -644,17 +676,15 @@ class Resolver {
     }
 }
 
-class Generator {}
-
 /**
- * ## Name currently undecided
+ * ## `typegc` - Type Guard Compiler
  *
  * ### How the compiler works
  *
  * - Tokenizer tokenizes schema into tokens
  * - Parser parse tokens into structures
  * - Resolver converts structures into an IR
- * - Generator takes IR and outputs JavaScript and type declarations.
+ * - IR is turned into either JS and type declarations or execution tree
  *
  * **Between each step, plugins will be executed.**
  */
@@ -681,10 +711,27 @@ model APIError {
 
 console.clear();
 
-const tokens = new Tokenizer(schema).tokenize();
+function isSnakeCase(string: string) {
+    return /^[a-z]+(_[a-z]+)*$/.test(string);
+}
 
-const structs = new Parser(tokens).parse();
+function compile(schema: string) {
+    const tokens = new Tokenizer(schema).tokenize();
 
-const resolved = new Resolver(structs).resolve();
+    const structs = new Parser(tokens).parse();
 
-for (const key in resolved) console.log(key, resolved[key as keyof typeof resolved]);
+    const resolved = new Resolver(structs).resolve();
+
+    return `\
+const wrap = (e) => {
+    if (e instanceof Error) throw e;
+
+    return e;
+};
+
+` + [...resolved.models.entries()].map(([name, model]) => `\
+export const is${isSnakeCase(name) ? "_" : ""}${name} = ${model.js};
+`).join("\n");
+}
+
+console.log(compile(schema));
