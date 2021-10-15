@@ -21,12 +21,12 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/cursorsdottsx/guardc.git"
+        "url": "git+https://github.com/cursorsdottsx/typegc.git"
     },
     "bugs": {
-        "url": "https://github.com/cursorsdottsx/guardc/issues"
+        "url": "https://github.com/cursorsdottsx/typegc/issues"
     },
-    "homepage": "https://github.com/cursorsdottsx/guardc#readme",
+    "homepage": "https://github.com/cursorsdottsx/typegc#readme",
     "dependencies": {
         "tslib": "^2.3.1"
     }
