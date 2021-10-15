@@ -46,8 +46,8 @@ namespace Parser {
           };
 }
 
-type Constraint = ((value: any) => boolean | Error) & { js: string; };
-type Factory = ((...args: any[]) => Constraint) & { isFactory: true } & { js: string; };
+type Constraint = ((value: any) => boolean | Error) & { js: string; global: string; };
+type Factory = ((...args: any[]) => Constraint) & { isFactory: true } & { js: string; global: string; };
 type ConstraintOrFactory = Constraint | Factory;
 
 class Tokenizer {
@@ -114,17 +114,17 @@ class Tokenizer {
                 {
                     type: "NUMBER",
                     regex: /^([+-]?\d+(?:\.?\d*)?|\.\d+)/,
-                    expect: ["WHITESPACE", "CLOSING_PARENTHESES", "COMMA"],
+                    expect: ["NEWLINE", "WHITESPACE", "CLOSING_PARENTHESES", "COMMA"],
                 },
                 {
                     type: "STRING",
                     regex: /^("(?:[^"]|(?<=\\)")*"|'(?:[^']|(?<=\\)')*')/,
-                    expect: ["WHITESPACE", "CLOSING_PARENTHESES", "COMMA"],
+                    expect: ["NEWLINE", "WHITESPACE", "CLOSING_PARENTHESES", "COMMA"],
                 },
                 {
                     type: "BOOLEAN",
                     regex: /^(true|false)/,
-                    expect: ["WHITESPACE", "CLOSING_PARENTHESES", "COMMA"],
+                    expect: ["NEWLINE", "WHITESPACE", "CLOSING_PARENTHESES", "COMMA"],
                 },
                 {
                     type: "OPENING_BRACKET",
@@ -433,6 +433,7 @@ class Resolver {
                             throw new RangeError(`Expected 1-3 arguments for the range factory, got none.`);
                         }, {
                             js: `() => {}`, // ! Add range factory JS (instead of checking parameters per function call, check parameters, then return different functions based on the parameters to make it easier to write the JS for the range factory)
+                            global: ``,
                         });
                     },
                 ],
@@ -443,7 +444,9 @@ class Resolver {
 
                         const regex = new RegExp(pattern, flags);
 
-                        return Object.assign((v: string) => regex.test(v), { js: `(v) => new RegExp("${pattern.replaceAll('"', '\\"')}").test(v)` });
+                        const id = Date.now();
+
+                        return Object.assign((v: string) => regex.test(v), { js: `(v) => {{ name }}${id}.test(v)`, global: `const {{ name }}${id} = new RegExp("${pattern.replaceAll('"', '\\"')}")` });
                     },
                 ],
             ].map(([key, value]) => [key, Object.assign(value, { js: value.toString(), isFactory: true })] as [string, Factory])
@@ -462,7 +465,18 @@ class Resolver {
         ]),
         defs: new Map<string, Constraint>(),
         models: new Map<string, Constraint>(),
+        globals: ``,
     };
+
+    public gen(name: string, fn: Constraint) {
+        const templates = [
+            ["name", name],
+        ];
+
+        if (fn.global) this.resolved.globals += "\n" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.global);
+
+        return "(" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.js) + ")";
+    }
 
     public constructor(public readonly source: Parser.Struct[]) {}
 
@@ -517,7 +531,31 @@ class Resolver {
                 while (body.length) {
                     const token = body.shift()!;
 
-                    if (token.type === "IDENTIFIER") resolved.push(...this.identifier(token, body));
+                    if (token.type === "IDENTIFIER") {
+                        const binded = this.identifier(token, body);
+
+                        if (Resolver.isalias(binded)) resolved.push(Object.assign((v: any) => binded.every((fn) => {
+                            const e = fn(v[prop.value]);
+
+                            if (e instanceof Error) throw e;
+
+                            return e;
+                        }), {
+                            js: `(v) => alias$${token.value}.every((fn) => wrap(fn(v)))`,
+                            global: ``,
+                        }));
+                        else if (Resolver.isstruct(binded[0])) resolved.push(Object.assign((v: any) => binded.every((fn) => {
+                            const e = fn(v[prop.value]);
+
+                            if (e instanceof Error) throw e;
+
+                            return e;
+                        }), {
+                            js: this.resolved.defs.has(token.value) ? `def$${token.value}` : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
+                            global: ``,
+                        }));
+                        else resolved.push(...binded);
+                    }
                 }
 
                 constraints.push(Object.assign((v: any) =>
@@ -528,8 +566,9 @@ class Resolver {
 
                         return e;
                     }), {
-                        js: `(v) => [${resolved.map((fn) => "(" + fn.js + ")").join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
-                    })
+                        js: `(v) => [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
+                        global: ``,
+                    }),
                 );
             });
 
@@ -541,8 +580,9 @@ class Resolver {
 
                     return e;
                 }), {
-                    js: `(v) => [${constraints.map((fn) => "(" + fn.js + ")").join(", ")}].every((fn) => wrap(fn(v)))`,
-                }
+                    js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
+                    global: ``,
+                },
             ));
         }
 
@@ -557,7 +597,31 @@ class Resolver {
                 while (body.length) {
                     const token = body.shift()!;
 
-                    if (token.type === "IDENTIFIER") resolved.push(...this.identifier(token, body));
+                    if (token.type === "IDENTIFIER") {
+                        const binded = this.identifier(token, body);
+
+                        if (Resolver.isalias(binded)) resolved.push(Object.assign((v: any) => binded.every((fn) => {
+                            const e = fn(v[prop.value]);
+
+                            if (e instanceof Error) throw e;
+
+                            return e;
+                        }), {
+                            js: `(v) => alias$${token.value}.every((fn) => wrap(fn(v)))`,
+                            global: ``,
+                        }));
+                        else if (Resolver.isstruct(binded[0])) resolved.push(Object.assign((v: any) => binded.every((fn) => {
+                            const e = fn(v[prop.value]);
+
+                            if (e instanceof Error) throw e;
+
+                            return e;
+                        }), {
+                            js: this.resolved.defs.has(token.value) ? `def$${token.value}` : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
+                            global: ``,
+                        }));
+                        else resolved.push(...binded);
+                    }
                 }
 
                 constraints.push(Object.assign((v: any) =>
@@ -568,8 +632,9 @@ class Resolver {
 
                         return e;
                     }), {
-                        js: `(v) => [${resolved.map((fn) => "(" + fn.js + ")").join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
-                    })
+                        js: `(v) => [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
+                        global: ``,
+                    }),
                 );
             });
 
@@ -581,8 +646,9 @@ class Resolver {
 
                     return e;
                 }), {
-                    js: `(v) => [${constraints.map((fn) => "(" + fn.js + ")").join(", ")}].every((fn) => wrap(fn(v)))`,
-                }
+                    js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
+                    global: ``,
+                },
             ));
         }
 
@@ -640,11 +706,11 @@ class Resolver {
             return [binded(...args)];
         } else if (body[0]?.type !== "IDENTIFIER" && body[0]) throw new SyntaxError(`Unexpected token '${token.value}' at ${token.line}:${token.col}.`);
         else {
-            const binded = this.binded(token);
-
             if (Resolver.isfactory(binded)) throw new ReferenceError(`Factory wasn't called at ${token.line}:${token.col}.`);
 
-            return [binded].flat();
+            if (Array.isArray(binded)) return Object.assign(binded, { isAlias: true });
+
+            return [binded];
         }
     }
 
@@ -657,6 +723,8 @@ class Resolver {
             Resolver.builtins.factories.get(token.value);
 
         if (!binded) throw new ReferenceError(`Identifier '${token.value}' does not exist at ${token.line}:${token.col}.`);
+
+        if (this.resolved.defs.has(token.value) || this.resolved.models.has(token.value)) return Object.assign(binded, { isStruct: true });
 
         return binded;
     }
@@ -674,20 +742,15 @@ class Resolver {
     private static isfactory(v: any): v is Factory {
         return typeof v === "function" && v.isFactory === true;
     }
-}
 
-/**
- * ## `typegc` - Type Guard Compiler
- *
- * ### How the compiler works
- *
- * - Tokenizer tokenizes schema into tokens
- * - Parser parse tokens into structures
- * - Resolver converts structures into an IR
- * - IR is turned into either JS and type declarations or execution tree
- *
- * **Between each step, plugins will be executed.**
- */
+    private static isalias(v: any): v is (Constraint[]) & { isAlias: true } {
+        return Array.isArray(v) && v.every((fn) => typeof fn === "function") && (v as any).isAlias === true;
+    }
+
+    private static isstruct(v: any): v is Constraint & { isStruct: true } {
+        return typeof v === "function" && v.isStruct === true;
+    }
+}
 
 const schema = `
 config {
@@ -704,7 +767,7 @@ define ErrorObject {
 model APIError {
   status   number      ErrorCode
   message  string
-  endpoint string      match("(/[^/])+")
+  endpoint string      match("(/[^/]*)+")
   error    ErrorObject
 }
 `;
@@ -720,18 +783,53 @@ function compile(schema: string) {
 
     const structs = new Parser(tokens).parse();
 
-    const resolved = new Resolver(structs).resolve();
+    const resolver = new Resolver(structs);
+    
+    const resolved = resolver.resolve();
 
-    return `\
+    return `
+/**
+ * typegc - Type Guard Compiler
+ * 
+ * version 1.0.0
+ * 
+ * AUTO-GENERATED FILE DO NOT EDIT DIRECTLY
+ */
+
+/**
+ * config
+${JSON.stringify(Object.fromEntries([...resolved.config.entries()]), undefined, 4).split("\n").map((line) => ` * ${line}`).join("\n")}
+ */
+
 const wrap = (e) => {
     if (e instanceof Error) throw e;
 
     return e;
 };
 
-` + [...resolved.models.entries()].map(([name, model]) => `\
+/**
+ * globals
+ */${resolved.globals}
+
+/**
+ * aliases
+ */
+${[...resolved.aliases.entries()].map(([name, alias]) => `const alias$${name} = [${alias.map((fn) => resolver.gen(`alias$${name}`, fn)).join(", ")}];`).join("\n")}
+
+/**
+ * definitions
+ */
+${[...resolved.defs.entries()].map(([name, def]) => `\
+const def$${name} = ${def.js};
+`).join("\n")}
+/**
+ * models
+ */
+${[...resolved.models.entries()].map(([name, model]) => `\
 export const is${isSnakeCase(name) ? "_" : ""}${name} = ${model.js};
-`).join("\n");
+`).join("\n")}
+`;
 }
 
 console.log(compile(schema));
+
