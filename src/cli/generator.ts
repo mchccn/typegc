@@ -46,8 +46,8 @@ namespace Parser {
           };
 }
 
-type Constraint = ((value: any) => boolean | Error) & { js: string; global: string; };
-type Factory = ((...args: any[]) => Constraint) & { isFactory: true } & { js: string; global: string; };
+type Constraint = ((value: any) => boolean | Error) & { ts: string; js: string; global: string; };
+type Factory = ((...args: any[]) => Constraint) & { isFactory: true } & { ts: string; js: string; global: string; };
 type ConstraintOrFactory = Constraint | Factory;
 
 class Tokenizer {
@@ -333,6 +333,8 @@ class Parser {
                 if (!current) throw new SyntaxError(`Unexpected end of input.`);
 
                 if (current.type === "NEWLINE") {
+                    if (line.length < 2) throw new SyntaxError(`Property does not have any constraints at ${line[0].line}:${line[0].col}.`);
+
                     body.push(line);
 
                     line = [];
@@ -432,7 +434,8 @@ class Resolver {
 
                             throw new RangeError(`Expected 1-3 arguments for the range factory, got none.`);
                         }, {
-                            js: `() => {}`, // ! Add range factory JS (instead of checking parameters per function call, check parameters, then return different functions based on the parameters to make it easier to write the JS for the range factory)
+                            ts: `string | number`,
+                            js: `() => true`, // ! Add range factory JS (instead of checking parameters per function call, check parameters, then return different functions based on the parameters to make it easier to write the JS for the range factory)
                             global: ``,
                         });
                     },
@@ -446,16 +449,18 @@ class Resolver {
 
                         const id = Date.now();
 
-                        return Object.assign((v: string) => regex.test(v), { js: `(v) => {{ name }}${id}.test(v)`, global: `const {{ name }}${id} = new RegExp("${pattern.replaceAll('"', '\\"')}")` });
+                        return Object.assign((v: string) => regex.test(v), { ts: `string`, js: `(v) => {{ name }}${id}.test(v)`, global: `const {{ name }}${id} = new RegExp("${pattern.replaceAll('"', '\\"')}")` });
                     },
                 ],
-            ].map(([key, value]) => [key, Object.assign(value, { js: value.toString(), isFactory: true })] as [string, Factory])
+            ].map(([key, value]) => [key, Object.assign(value, { ts: `string`, js: value.toString(), isFactory: true })] as [string, Factory])
         ),
         primitives: new Map<string, Constraint>([
             ["string", (v: any) => typeof v === "string"],
             ["number", (v: any) => typeof v === "number"],
             ["boolean", (v: any) => typeof v === "boolean"],
-        ].map(([key, value]) => [key, Object.assign(value, { js: value.toString() })] as [string, Constraint])),
+            ["bigint", (v: any) => typeof v === "bigint"],
+            ["symbol", (v: any) => typeof v === "symbol"],
+        ].map(([key, value]) => [key, Object.assign(value, { ts: key, js: value.toString(), global: `` })] as [string, Constraint])),
     };
 
     private readonly resolved = {
@@ -463,8 +468,8 @@ class Resolver {
         aliases: new Map<string, Constraint[]>([
             ...[...Resolver.builtins.primitives].map(([key, constraint]) => [key, [constraint]] as [string, Constraint[]]),
         ]),
-        defs: new Map<string, Constraint>(),
-        models: new Map<string, Constraint>(),
+        defs: new Map<string, Constraint & { properties: [string, string][] }>(),
+        models: new Map<string, Constraint & { properties: [string, string][] }>(),
         globals: ``,
     };
 
@@ -475,7 +480,7 @@ class Resolver {
 
         if (fn.global) this.resolved.globals += "\n" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.global);
 
-        return "(" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.js) + ")";
+        return "(" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.js) + ")" + `/* ${fn.ts} */`;
     }
 
     public constructor(public readonly source: Parser.Struct[]) {}
@@ -503,7 +508,7 @@ class Resolver {
         }
 
         if (struct.type === "ALIAS") {
-            if (this.resolved.aliases.has(struct.name)) throw new ReferenceError(`Alias '${struct.name}' already exists.`);
+            if (this.exists(struct.name)) throw new ReferenceError(`Cannot redeclare identifier '${struct.name}'.`);
 
             if (!struct.body.length) throw new SyntaxError(`Alias '${struct.name}' has an empty body.`);
 
@@ -521,7 +526,11 @@ class Resolver {
         }
 
         if (struct.type === "DEFINE") {
+            if (this.exists(struct.name)) throw new ReferenceError(`Cannot redeclare identifier '${struct.name}'.`);
+            
             const constraints = [] as Constraint[];
+
+            const properties = [] as [string, string][];
 
             struct.body.forEach(([prop, ...tokens]) => {
                 const resolved = [] as Constraint[];
@@ -541,6 +550,7 @@ class Resolver {
 
                             return e;
                         }), {
+                            ts: [...new Set(binded.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
                             js: `(v) => alias$${token.value}.every((fn) => wrap(fn(v)))`,
                             global: ``,
                         }));
@@ -551,6 +561,7 @@ class Resolver {
 
                             return e;
                         }), {
+                            ts: token.value,
                             js: this.resolved.defs.has(token.value) ? `def$${token.value}` : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
                             global: ``,
                         }));
@@ -566,10 +577,13 @@ class Resolver {
 
                         return e;
                     }), {
+                        ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
                         js: `(v) => [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
                         global: ``,
                     }),
                 );
+               
+                properties.push([prop.value, [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | ")]);
             });
 
             return void this.resolved.defs.set(struct.name, Object.assign((v: any) =>
@@ -580,6 +594,8 @@ class Resolver {
 
                     return e;
                 }), {
+                    properties,
+                    ts: struct.name,
                     js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
                     global: ``,
                 },
@@ -587,7 +603,11 @@ class Resolver {
         }
 
         if (struct.type === "MODEL") {
+            if (this.exists(struct.name)) throw new ReferenceError(`Cannot redeclare identifier '${struct.name}'.`);
+
             const constraints = [] as Constraint[];
+
+            const properties = [] as [string, string][];
 
             struct.body.forEach(([prop, ...tokens]) => {
                 const resolved = [] as Constraint[];
@@ -607,6 +627,7 @@ class Resolver {
 
                             return e;
                         }), {
+                            ts: [...new Set(binded.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
                             js: `(v) => alias$${token.value}.every((fn) => wrap(fn(v)))`,
                             global: ``,
                         }));
@@ -617,6 +638,7 @@ class Resolver {
 
                             return e;
                         }), {
+                            ts: token.value,
                             js: this.resolved.defs.has(token.value) ? `def$${token.value}` : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
                             global: ``,
                         }));
@@ -632,10 +654,13 @@ class Resolver {
 
                         return e;
                     }), {
+                        ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
                         js: `(v) => [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
                         global: ``,
                     }),
                 );
+
+                properties.push([prop.value, [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | ")]);
             });
 
             return void this.resolved.models.set(struct.name, Object.assign((v: any) =>
@@ -646,6 +671,8 @@ class Resolver {
 
                     return e;
                 }), {
+                    properties,
+                    ts: struct.name,
                     js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
                     global: ``,
                 },
@@ -729,6 +756,16 @@ class Resolver {
         return binded;
     }
 
+    private exists(id: string) {
+        return !!(
+            this.resolved.aliases.get(id) ??
+            this.resolved.defs.get(id) ??
+            this.resolved.models.get(id) ??
+            Resolver.builtins.primitives.get(id) ??
+            Resolver.builtins.factories.get(id)
+        );
+    }
+
     private static primitivify(token: Tokenizer.Token) {
         if (token.type === "BOOLEAN") return token.value === "true";
 
@@ -787,7 +824,7 @@ function compile(schema: string) {
     
     const resolved = resolver.resolve();
 
-    return `
+    return [`
 /**
  * typegc - Type Guard Compiler
  * 
@@ -828,8 +865,50 @@ const def$${name} = ${def.js};
 ${[...resolved.models.entries()].map(([name, model]) => `\
 export const is${isSnakeCase(name) ? "_" : ""}${name} = ${model.js};
 `).join("\n")}
-`;
+`, `
+/**
+ * typegc - Type Guard Compiler
+ * 
+ * version 1.0.0
+ * 
+ * AUTO-GENERATED FILE DO NOT EDIT DIRECTLY
+ */
+
+/**
+ * config
+${JSON.stringify(Object.fromEntries([...resolved.config.entries()]), undefined, 4).split("\n").map((line) => ` * ${line}`).join("\n")}
+ */
+
+/**
+ * type aliases
+ */
+${[...resolved.aliases.entries()].map(([name, alias]) => `\
+type ${name} = ${[...new Set(alias.flatMap((fn) => fn.ts.split(" | ")))].join(" | ")};\
+`).join("\n")}
+
+/**
+ * interfaces
+ */
+${[...resolved.defs.entries()].map(([name, model]) => `\
+interface ${name} {
+${model.properties.map(([prop, type]) => `    ${prop}: ${type};`).join("\n")}
+}`).join("\n")}
+
+/**
+ * exported interfaces
+ */
+${[...resolved.models.entries()].map(([name, model]) => `\
+export interface ${name} {
+${model.properties.map(([prop, type]) => `    ${prop}: ${type};`).join("\n")}
+}`).join("\n")}
+
+/**
+ * type guards
+ */
+${[...resolved.models.entries()].map(([name, model]) => `\
+export declare const is${isSnakeCase(name) ? "_" : ""}${name}: (v: unknown) => v is ${name};
+`).join("\n")}
+`] as [js: string, dts: string];
 }
 
 console.log(compile(schema));
-
