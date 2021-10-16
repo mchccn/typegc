@@ -150,7 +150,7 @@ export class Resolver {
                                         }),
                                     {
                                         ts: [...new Set(binded.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
-                                        js: `(v) => alias$${token.value}.every((fn) => wrap(fn(v)))`,
+                                        js: `(v) => ${token.value}().every((fn) => wrap(fn(v)))`,
                                         global: ``,
                                         dependencies: deps,
                                     }
@@ -169,9 +169,7 @@ export class Resolver {
                                         }),
                                     {
                                         ts: token.value,
-                                        js: this.resolved.defs.has(token.value)
-                                            ? `def$${token.value}`
-                                            : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
+                                        js: this.resolved.defs.has(token.value) ? `${token.value}` : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
                                         global: ``,
                                         dependencies: deps,
                                     }
@@ -196,9 +194,13 @@ export class Resolver {
                         {
                             ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
                             js: `(v) => array$${struct.name}$${prop.value}${id}.every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
-                            global: `const array$${struct.name}$${prop.value}${id} = [${resolved
-                                .map((fn) => this.gen(`${struct.name}$${prop.value}`, fn))
-                                .join(", ")}]`,
+                            global: `const array$${struct.name}$${prop.value}${id} = ((${[...propdeps.entries()]
+                                .map(([dep]) => `retrieve$${dep}`)
+                                .join(", ")}) => { return [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}] })(${[
+                                ...propdeps.entries(),
+                            ]
+                                .map(([dep]) => `() => ${dep}`)
+                                .join(", ")});`,
                             dependencies: [...propdeps.entries()],
                         }
                     )
@@ -268,7 +270,7 @@ export class Resolver {
                                         }),
                                     {
                                         ts: [...new Set(binded.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
-                                        js: `(v) => alias$${token.value}.every((fn) => wrap(fn(v)))`,
+                                        js: `(v) => ${token.value}().every((fn) => wrap(fn(v)))`,
                                         global: ``,
                                         dependencies: deps,
                                     }
@@ -287,9 +289,7 @@ export class Resolver {
                                         }),
                                     {
                                         ts: token.value,
-                                        js: this.resolved.defs.has(token.value)
-                                            ? `def$${token.value}`
-                                            : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
+                                        js: this.resolved.defs.has(token.value) ? `${token.value}` : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
                                         global: ``,
                                         dependencies: deps,
                                     }
@@ -314,9 +314,15 @@ export class Resolver {
                         {
                             ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
                             js: `(v) => array$${struct.name}$${prop.value}${id}.every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
-                            global: `const array$${struct.name}$${prop.value}${id} = [${resolved
-                                .map((fn) => this.gen(`${struct.name}$${prop.value}`, fn))
-                                .join(", ")}]`,
+                            global: `const array$${struct.name}$${prop.value}${id} = ((${[...propdeps.entries()]
+                                .map(([dep]) => `retrieve$${dep}`)
+                                .join(", ")}) => { ${[...propdeps.entries()]
+                                .map(([dep]) => `let cached$${dep};\nconst ${dep} = () => cached$${dep} ?? (cached$${dep} = retrieve$${dep}());`)
+                                .join("\n")} return [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}] })(${[
+                                ...propdeps.entries(),
+                            ]
+                                .map(([dep]) => `() => ${dep}`)
+                                .join(", ")});`,
                             dependencies: [...propdeps.entries()],
                         }
                     )
