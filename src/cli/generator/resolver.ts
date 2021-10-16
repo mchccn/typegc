@@ -4,18 +4,17 @@ import { Parser } from "./parser";
 import { Tokenizer } from "./tokenizer";
 import { Constraint, Factory } from "./types";
 import { isSnakeCase } from "./utils";
+import { uuid } from "./uuid";
 
 export class Resolver {
     public static loaded = false;
 
     public static async load() {
-        const files = (await readdir(join(__dirname, "functions"))).filter((file) => file.split(".")[1] === "js");
+        const files = (await readdir(join(__dirname, "functions"))).filter((file) => file.split(".")[1] !== ".d.ts");
 
-        const functions = (
-            await Promise.all(
-                files.map((file) => import(join(__dirname, "functions", file)).then((file) => file.default as Factory))
-            )
-        ).map((fn) => Object.assign(fn, { isFactory: true }));
+        const functions = (await Promise.all(files.map((file) => import(join(__dirname, "functions", file)).then((file) => file.default as Factory)))).map(
+            (fn) => Object.assign(fn, { isFactory: true })
+        );
 
         functions.forEach((fn, i) => {
             Resolver.builtins.factories.set(files[i].split(".")[0], fn);
@@ -35,19 +34,14 @@ export class Resolver {
                 ["boolean", (v: any) => typeof v === "boolean"],
                 ["bigint", (v: any) => typeof v === "bigint"],
                 ["symbol", (v: any) => typeof v === "symbol"],
-            ].map(
-                ([key, value]) =>
-                    [key, Object.assign(value, { ts: key, js: value.toString(), global: `` })] as [string, Constraint]
-            )
+            ].map(([key, value]) => [key, Object.assign(value, { ts: key, js: value.toString(), global: `` })] as [string, Constraint])
         ),
     };
 
     private readonly resolved = {
         config: new Map<string, string | number | boolean>(),
         aliases: new Map<string, Constraint[]>([
-            ...[...Resolver.builtins.primitives].map(
-                ([key, constraint]) => [key, [constraint]] as [string, Constraint[]]
-            ),
+            ...[...Resolver.builtins.primitives].map(([key, constraint]) => [key, [constraint]] as [string, Constraint[]]),
         ]),
         defs: new Map<string, Constraint & { properties: [string, string][] }>(),
         models: new Map<string, Constraint & { properties: [string, string][] }>(),
@@ -57,16 +51,9 @@ export class Resolver {
     public gen(name: string, fn: Constraint) {
         const templates = [["name", name]];
 
-        if (fn.global)
-            this.resolved.globals +=
-                "\n" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.global);
+        if (fn.global) this.resolved.globals += "\n" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.global);
 
-        return (
-            "(" +
-            templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.js) +
-            ")" +
-            `/* ${fn.ts} */`
-        );
+        return "(" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.js) + ")" + `/* ${fn.ts} */`;
     }
 
     public constructor(public readonly source: Parser.Struct[]) {}
@@ -84,8 +71,7 @@ export class Resolver {
 
         if (struct.type === "CONFIG") {
             return void struct.body.forEach(([option, value]) => {
-                if (option.type !== "IDENTIFIER")
-                    throw new SyntaxError(`Incorrect configuration syntax at ${option.line}:${option.col}.`);
+                if (option.type !== "IDENTIFIER") throw new SyntaxError(`Incorrect configuration syntax at ${option.line}:${option.col}.`);
 
                 if (!["NUMBER", "STRING", "BOOLEAN"].includes(value.type))
                     throw new SyntaxError(`Incorrect configuration syntax at ${option.line}:${option.col}.`);
@@ -209,9 +195,7 @@ export class Resolver {
                     {
                         properties,
                         ts: struct.name,
-                        js: `(v) => [${constraints
-                            .map((fn) => this.gen(struct.name, fn))
-                            .join(", ")}].every((fn) => wrap(fn(v)))`,
+                        js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
                         global: ``,
                     }
                 )
@@ -278,6 +262,8 @@ export class Resolver {
                     }
                 }
 
+                const id = uuid.next().value;
+
                 constraints.push(
                     Object.assign(
                         (v: any) =>
@@ -290,10 +276,10 @@ export class Resolver {
                             }),
                         {
                             ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
-                            js: `(v) => [${resolved
+                            js: `(v) => array$${struct.name}$${prop.value}${id}.every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
+                            global: `var array$${struct.name}$${prop.value}${id} = [${resolved
                                 .map((fn) => this.gen(`${struct.name}$${prop.value}`, fn))
-                                .join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
-                            global: ``,
+                                .join(", ")}]`,
                         }
                     )
                 );
@@ -315,9 +301,7 @@ export class Resolver {
                     {
                         properties,
                         ts: struct.name,
-                        js: `(v) => [${constraints
-                            .map((fn) => this.gen(struct.name, fn))
-                            .join(", ")}].every((fn) => wrap(fn(v)))`,
+                        js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
                         global: ``,
                     }
                 )
@@ -341,8 +325,7 @@ export class Resolver {
         const binded = this.binded(token);
 
         if (body[0]?.type === "OPENING_PARENTHESES") {
-            if (!Resolver.isfactory(binded))
-                throw new ReferenceError(`Identifier is not a factory at ${token.line}:${token.col}.`);
+            if (!Resolver.isfactory(binded)) throw new ReferenceError(`Identifier is not a factory at ${token.line}:${token.col}.`);
 
             const tokens = [] as Tokenizer.Token[];
 
@@ -360,10 +343,7 @@ export class Resolver {
 
             const args = tokens.flatMap((token, i): (string | number | boolean | Constraint)[] => {
                 if (i % 2) {
-                    if (token.type !== "COMMA")
-                        throw new SyntaxError(
-                            `Expected comma at ${token.line}:${token.col}, instead got '${token.value}'.`
-                        );
+                    if (token.type !== "COMMA") throw new SyntaxError(`Expected comma at ${token.line}:${token.col}, instead got '${token.value}'.`);
 
                     return [];
                 }
@@ -371,10 +351,7 @@ export class Resolver {
                 if (token.type === "IDENTIFIER") {
                     const res = this.identifier(token, body);
 
-                    if (res.length > 2)
-                        throw new ReferenceError(
-                            `Cannot pass '${token.value}' as a parameter at ${token.line}:${token.col}.`
-                        );
+                    if (res.length > 2) throw new ReferenceError(`Cannot pass '${token.value}' as a parameter at ${token.line}:${token.col}.`);
 
                     return [res[0]];
                 }
@@ -383,11 +360,9 @@ export class Resolver {
             });
 
             return [binded(...args)];
-        } else if (body[0]?.type !== "IDENTIFIER" && body[0])
-            throw new SyntaxError(`Unexpected token '${token.value}' at ${token.line}:${token.col}.`);
+        } else if (body[0]?.type !== "IDENTIFIER" && body[0]) throw new SyntaxError(`Unexpected token '${token.value}' at ${token.line}:${token.col}.`);
         else {
-            if (Resolver.isfactory(binded))
-                throw new ReferenceError(`Factory wasn't called at ${token.line}:${token.col}.`);
+            if (Resolver.isfactory(binded)) throw new ReferenceError(`Factory wasn't called at ${token.line}:${token.col}.`);
 
             if (Array.isArray(binded)) return Object.assign(binded, { isAlias: true });
 
@@ -403,11 +378,9 @@ export class Resolver {
             Resolver.builtins.primitives.get(token.value) ??
             Resolver.builtins.factories.get(token.value);
 
-        if (!binded)
-            throw new ReferenceError(`Identifier '${token.value}' does not exist at ${token.line}:${token.col}.`);
+        if (!binded) throw new ReferenceError(`Identifier '${token.value}' does not exist at ${token.line}:${token.col}.`);
 
-        if (this.resolved.defs.has(token.value) || this.resolved.models.has(token.value))
-            return Object.assign(binded, { isStruct: true });
+        if (this.resolved.defs.has(token.value) || this.resolved.models.has(token.value)) return Object.assign(binded, { isStruct: true });
 
         return binded;
     }

@@ -41,13 +41,13 @@ const wrap = (e) => {
 
 /**
  * globals
- */${resolved.globals}
+ */${[...new Set(resolved.globals.split("\n"))].join("\n")}
 
 /**
  * aliases
  */
 ${[...resolved.aliases.entries()]
-    .map(([name, alias]) => `const alias$${name} = [${alias.map((fn) => resolver.gen(`alias$${name}`, fn)).join(", ")}];`)
+    .map(([name, alias]) => `var alias$${name} = [${alias.map((fn) => resolver.gen(`alias$${name}`, fn)).join(", ")}];`)
     .join("\n")}
 
 /**
@@ -56,7 +56,7 @@ ${[...resolved.aliases.entries()]
 ${[...resolved.defs.entries()]
     .map(
         ([name, def]) => `\
-const def$${name} = ${def.js};
+var def$${name} = ${def.js};
 `
     )
     .join("\n")}
@@ -66,7 +66,7 @@ const def$${name} = ${def.js};
 ${[...resolved.models.entries()]
     .map(
         ([name, model]) => `\
-export const is${isSnakeCase(name) ? "_" : ""}${name} = ${model.js};
+export var is${isSnakeCase(name) ? "_" : ""}${name} = ${model.js};
 `
     )
     .join("\n")}

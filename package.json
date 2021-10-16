@@ -25,6 +25,7 @@
         "@types/chai": "^4.2.22",
         "@types/mocha": "^9.0.0",
         "@types/node": "^16.11.0",
+        "@types/prettier": "^2.4.1",
         "@types/yargs": "^17.0.4",
         "chai": "^4.3.4",
         "chokidar-cli": "^3.0.0",

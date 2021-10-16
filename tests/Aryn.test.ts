@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import prettier from "prettier";
 import { Generator } from "../src/cli/generator";
 import { Parser } from "../src/cli/generator/parser";
 import { Resolver } from "../src/cli/generator/resolver";
@@ -34,9 +35,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
     }
     `;
 
-    before(async () => {
-        await Resolver.load();
-    });
+    before(() => Resolver.load());
 
     it("tokenizes correctly", (done) => {
         expect(new Tokenizer(schema).tokenize()).to.deep.equal([
@@ -236,8 +235,8 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
             js: resolved.models.get("APIError")!.js,
             global: "",
         });
-        expect(resolved.globals).to.satisfy(
-            (s: string) => s.startsWith(`\nconst APIError$endpoint`) && s.endsWith(` = new RegExp("(/[^/]*)+");`)
+        expect(resolved.globals).to.equal(
+            `\nvar APIError$endpoint2 = new RegExp("(/[^/]*)+");\nvar array$APIError$status0 = [((v) => alias$number.every((fn) => wrap(fn(v))))/* number */, ((v) => alias$ErrorCode.every((fn) => wrap(fn(v))))/* string | number */]\nvar array$APIError$message1 = [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */]\nvar array$APIError$endpoint3 = [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */, ((v) => APIError$endpoint2.test(v))/* string */]\nvar array$APIError$error4 = [(def$ErrorObject)/* ErrorObject */]`
         );
 
         return done();
@@ -352,11 +351,15 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
     });
 
     it("checks correctly at compile time", (done) => {
-        const fn = eval(new Generator(schema).generate()[0].replace(/export const isAPIError = /, ""));
+        const code = new Generator(schema).generate()[0];
 
-        expect(fn({})).to.be.false;
+        console.log(prettier.format(code, { parser: "babel" }));
+
+        const isAPIError = eval(code.replace(/export var isAPIError = /, ""));
+
+        expect(isAPIError({})).to.be.false;
         expect(
-            fn({
+            isAPIError({
                 status: "400",
                 message: "a message",
                 endpoint: "/",
@@ -367,7 +370,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
             })
         ).to.be.false;
         expect(
-            fn({
+            isAPIError({
                 status: 399,
                 message: "a message",
                 endpoint: "/",
@@ -378,7 +381,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
             })
         ).to.be.false;
         expect(
-            fn({
+            isAPIError({
                 status: 400,
                 message: "a message",
                 endpoint: "not an endpoint",
@@ -389,7 +392,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
             })
         ).to.be.false;
         expect(
-            fn({
+            isAPIError({
                 status: 400,
                 message: "a message",
                 endpoint: "/",
