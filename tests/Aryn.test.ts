@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import prettier from "prettier";
 import { Generator } from "../src/cli/generator";
 import { Parser } from "../src/cli/generator/parser";
 import { Resolver } from "../src/cli/generator/resolver";
@@ -207,8 +206,6 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
     it("resolves correctly", (done) => {
         const resolved = new Resolver(new Parser(new Tokenizer(schema).tokenize()).parse()).resolve();
 
-        console.log(Object.fromEntries(Object.entries(resolved.defs.get("ErrorObject")!)).dependencies);
-
         expect(resolved.config).to.deep.equal(new Map([["strict", true]]));
         expect(resolved.aliases.get("ErrorCode")).to.have.a.property("isAlias", true);
         expect(Object.fromEntries(Object.entries(resolved.aliases.get("ErrorCode")![0]).filter(([key]) => !["dependencies"].includes(key)))).to.deep.equal({
@@ -222,7 +219,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
                 ["stack", "string"],
             ],
             ts: "ErrorObject",
-            js: '(v) => [((v) => array$ErrorObject$message0.every((fn) => wrap(fn(v["message"]))))/* string */, ((v) => array$ErrorObject$stack1.every((fn) => wrap(fn(v["stack"]))))/* string */].every((fn) => wrap(fn(v)))',
+            js: "(v) => mainArray$ErrorObject.every((fn) => wrap(fn(v)))",
             global: "",
             isStruct: true,
         });
@@ -238,7 +235,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
             global: "",
         });
         expect(resolved.globals).to.equal(
-            `\nconst array$ErrorObject$message0 = ((retrieve$string) => { return [((v) => string.every((fn) => wrap(fn(v))))/* string */] })(() => string);\nconst array$ErrorObject$stack1 = ((retrieve$string) => { return [((v) => string.every((fn) => wrap(fn(v))))/* string */] })(() => string);\nconst APIError$endpoint4 = new RegExp("(/[^/]*)+");\nconst array$APIError$status2 = ((retrieve$number, retrieve$ErrorCode) => { let cached$number;\nconst number = () => cached$number ?? (cached$number = retrieve$number());\nlet cached$ErrorCode;\nconst ErrorCode = () => cached$ErrorCode ?? (cached$ErrorCode = retrieve$ErrorCode()); return [((v) => number().every((fn) => wrap(fn(v))))/* number */, ((v) => ErrorCode().every((fn) => wrap(fn(v))))/* string | number */] })(() => number, () => ErrorCode);\nconst array$APIError$message3 = ((retrieve$string) => { let cached$string;\nconst string = () => cached$string ?? (cached$string = retrieve$string()); return [((v) => string().every((fn) => wrap(fn(v))))/* string */] })(() => string);\nconst array$APIError$endpoint5 = ((retrieve$string) => { let cached$string;\nconst string = () => cached$string ?? (cached$string = retrieve$string()); return [((v) => string().every((fn) => wrap(fn(v))))/* string */, ((v) => APIError$endpoint4.test(v))/* string */] })(() => string);\nconst array$APIError$error6 = ((retrieve$ErrorObject) => { let cached$ErrorObject;\nconst ErrorObject = () => cached$ErrorObject ?? (cached$ErrorObject = retrieve$ErrorObject()); return [(ErrorObject)/* ErrorObject */] })(() => ErrorObject);`
+            `\nconst mainArray$ErrorObject = [((v) => array$ErrorObject$message0.every((fn) => wrap(fn(v["message"]))))/* string */, ((v) => array$ErrorObject$stack1.every((fn) => wrap(fn(v["stack"]))))/* string */];\nconst array$ErrorObject$message0 = ((retrieve$string) => { return [((v) => string().every((fn) => wrap(fn(v))))/* string */] })(() => string);\nconst array$ErrorObject$stack1 = ((retrieve$string) => { return [((v) => string().every((fn) => wrap(fn(v))))/* string */] })(() => string);\nconst APIError$endpoint4 = new RegExp("(/[^/]*)+");\nconst mainArray$APIError = [((v) => array$APIError$status2.every((fn) => wrap(fn(v["status"]))))/* number | string */, ((v) => array$APIError$message3.every((fn) => wrap(fn(v["message"]))))/* string */, ((v) => array$APIError$endpoint5.every((fn) => wrap(fn(v["endpoint"]))))/* string */, ((v) => array$APIError$error6.every((fn) => wrap(fn(v["error"]))))/* ErrorObject */];\nconst array$APIError$status2 = ((retrieve$number, retrieve$ErrorCode) => { let cached$number;\nconst number = () => cached$number ?? (cached$number = retrieve$number());\nlet cached$ErrorCode;\nconst ErrorCode = () => cached$ErrorCode ?? (cached$ErrorCode = retrieve$ErrorCode()); return [((v) => number().every((fn) => wrap(fn(v))))/* number */, ((v) => ErrorCode().every((fn) => wrap(fn(v))))/* string | number */] })(() => number, () => ErrorCode);\nconst array$APIError$message3 = ((retrieve$string) => { let cached$string;\nconst string = () => cached$string ?? (cached$string = retrieve$string()); return [((v) => string().every((fn) => wrap(fn(v))))/* string */] })(() => string);\nconst array$APIError$endpoint5 = ((retrieve$string) => { let cached$string;\nconst string = () => cached$string ?? (cached$string = retrieve$string()); return [((v) => string().every((fn) => wrap(fn(v))))/* string */, ((v) => APIError$endpoint4.test(v))/* string */] })(() => string);\nconst array$APIError$error6 = ((retrieve$ErrorObject) => { let cached$ErrorObject;\nconst ErrorObject = () => cached$ErrorObject ?? (cached$ErrorObject = retrieve$ErrorObject()); return [(ErrorObject)/* ErrorObject */] })(() => ErrorObject);`
         );
 
         return done();
@@ -353,11 +350,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
     });
 
     it("checks correctly at compile time", (done) => {
-        const code = new Generator(schema).generate()[0];
-
-        console.log(prettier.format(code, { parser: "babel" }));
-
-        const isAPIError = eval(code.replace(/export const isAPIError = /, ""));
+        const isAPIError = eval(new Generator(schema).generate()[0].replace(/export const isAPIError = /, ""));
 
         expect(isAPIError({})).to.be.false;
         expect(

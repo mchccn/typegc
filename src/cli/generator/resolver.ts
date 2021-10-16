@@ -211,6 +211,10 @@ export class Resolver {
                 properties.push([prop.value, [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | ")]);
             });
 
+            this.resolved.globals += `\nconst mainArray$${struct.name} = [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}];`;
+
+            constraints.forEach((fn) => this.gen(struct.name, fn));
+
             return void this.resolved.defs.set(
                 struct.name,
                 Object.assign(
@@ -225,7 +229,7 @@ export class Resolver {
                     {
                         properties,
                         ts: struct.name,
-                        js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
+                        js: `(v) => mainArray$${struct.name}.every((fn) => wrap(fn(v)))`,
                         global: ``,
                         dependencies: [...dependencies.entries()],
                     }
@@ -333,6 +337,10 @@ export class Resolver {
                 properties.push([prop.value, [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | ")]);
             });
 
+            this.resolved.globals += `\nconst mainArray$${struct.name} = [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}];`;
+
+            constraints.forEach((fn) => this.gen(struct.name, fn));
+
             return void this.resolved.models.set(
                 struct.name,
                 Object.assign(
@@ -347,7 +355,7 @@ export class Resolver {
                     {
                         properties,
                         ts: struct.name,
-                        js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
+                        js: `(v) => mainArray$${struct.name}.every((fn) => wrap(fn(v)))`,
                         global: ``,
                         dependencies: [...dependencies.entries()],
                     }
