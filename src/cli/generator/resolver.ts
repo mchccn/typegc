@@ -1,105 +1,33 @@
+import { readdir } from "fs/promises";
+import { join } from "path";
 import { Parser } from "./parser";
 import { Tokenizer } from "./tokenizer";
-import { Factory, Constraint } from "./types";
+import { Constraint, Factory } from "./types";
 import { isSnakeCase } from "./utils";
 
 export class Resolver {
+    public static loaded = false;
+
+    public static async load() {
+        const files = await readdir(join(__dirname, "functions"));
+
+        const functions = (
+            await Promise.all(
+                files.map((file) => import(join(__dirname, "functions", file)).then((file) => file.default as Factory))
+            )
+        ).map((fn) => Object.assign(fn, { isFactory: true }));
+
+        functions.forEach((fn, i) => {
+            Resolver.builtins.factories.set(files[i].split(".")[0], fn);
+        });
+
+        return (this.loaded = true);
+    }
+
     private structs = this.source;
 
     public static readonly builtins = {
-        factories: new Map<string, Factory>(
-            [
-                [
-                    "range",
-                    (start: number, stop?: number, step?: number) => {
-                        return Object.assign(
-                            (v: number | string) => {
-                                if (typeof start === "number" && typeof stop === "number" && typeof step === "number") {
-                                    if (typeof v === "string") return new RangeError(`String values cannot use the step parameter for the range factory.`);
-
-                                    if (stop <= start) return new RangeError(`Stop parameter must be greater than the start parameter in the range factory.`);
-
-                                    if (step <= 0) return new RangeError(`Step parameter for the range factory must be positive.`);
-
-                                    return v >= start && v <= stop && (v - start) % step === 0;
-                                }
-
-                                if (typeof start === "number" && typeof stop === "number") {
-                                    if (stop <= start) return new RangeError(`Stop parameter must be greater than the start parameter in the range factory.`);
-
-                                    if (typeof v === "string") return v.length >= start && v.length <= stop;
-
-                                    return v >= start && v <= stop;
-                                }
-
-                                if (typeof start === "number") {
-                                    if (start < 0) {
-                                        if (typeof v === "string")
-                                            throw new RangeError(`String values cannot use a negative end parameter in the range factory.`);
-
-                                        return v >= start;
-                                    }
-
-                                    return typeof v === "string" ? v.length <= start : v <= start && v >= 0;
-                                }
-
-                                throw new RangeError(`Expected 1-3 arguments for the range factory, got none.`);
-                            },
-                            {
-                                ts: `string | number`,
-                                js:
-                                    typeof start === "number" && typeof stop === "number" && typeof step === "number"
-                                        ? `(v) => {
-    if (typeof v === "string") return new RangeError(\`String values cannot use the step parameter for the range factory.\`);
-
-    if (stop <= start) return new RangeError(\`Stop parameter must be greater than the start parameter in the range factory.\`);
-
-    if (step <= 0) return new RangeError(\`Step parameter for the range factory must be positive.\`);
-
-    return v >= start && v <= stop && ((v - start) % step) === 0;
-}`
-                                        : typeof start === "number" && typeof stop === "number"
-                                        ? `(v) => {
-    if (stop <= start) return new RangeError(\`Stop parameter must be greater than the start parameter in the range factory.\`);
-
-    if (typeof v === "string") return v.length >= start && v.length <= stop;
-
-    return v >= start && v <= stop;
-}`
-                                        : typeof start === "number"
-                                        ? `(v) => {
-    if (start < 0) {
-        if (typeof v === "string") throw new RangeError(\`String values cannot use a negative end parameter in the range factory.\`);
-
-        return v >= start;
-    }
-
-    return typeof v === "string" ? v.length <= start : v <= start && v >= 0;
-}`
-                                        : `() => false`,
-                                global: ``,
-                            }
-                        );
-                    },
-                ],
-                [
-                    "match",
-                    (pattern: string, flags?: string) => {
-                        if (!pattern) return new TypeError(`Pattern provided to the match factory cannot be empty.`);
-
-                        const regex = new RegExp(pattern, flags);
-
-                        const id = Date.now();
-
-                        return Object.assign((v: string) => regex.test(v), {
-                            ts: `string`,
-                            js: `(v) => {{ name }}${id}.test(v)`,
-                            global: `const {{ name }}${id} = new RegExp("${pattern.replaceAll('"', '\\"')}")`,
-                        });
-                    },
-                ],
-            ].map(([key, value]) => [key, Object.assign(value, { ts: `string`, js: value.toString(), isFactory: true })] as [string, Factory])
-        ),
+        factories: new Map<string, Factory>(),
         primitives: new Map<string, Constraint>(
             [
                 ["string", (v: any) => typeof v === "string"],
@@ -107,14 +35,19 @@ export class Resolver {
                 ["boolean", (v: any) => typeof v === "boolean"],
                 ["bigint", (v: any) => typeof v === "bigint"],
                 ["symbol", (v: any) => typeof v === "symbol"],
-            ].map(([key, value]) => [key, Object.assign(value, { ts: key, js: value.toString(), global: `` })] as [string, Constraint])
+            ].map(
+                ([key, value]) =>
+                    [key, Object.assign(value, { ts: key, js: value.toString(), global: `` })] as [string, Constraint]
+            )
         ),
     };
 
     private readonly resolved = {
         config: new Map<string, string | number | boolean>(),
         aliases: new Map<string, Constraint[]>([
-            ...[...Resolver.builtins.primitives].map(([key, constraint]) => [key, [constraint]] as [string, Constraint[]]),
+            ...[...Resolver.builtins.primitives].map(
+                ([key, constraint]) => [key, [constraint]] as [string, Constraint[]]
+            ),
         ]),
         defs: new Map<string, Constraint & { properties: [string, string][] }>(),
         models: new Map<string, Constraint & { properties: [string, string][] }>(),
@@ -124,9 +57,16 @@ export class Resolver {
     public gen(name: string, fn: Constraint) {
         const templates = [["name", name]];
 
-        if (fn.global) this.resolved.globals += "\n" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.global);
+        if (fn.global)
+            this.resolved.globals +=
+                "\n" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.global);
 
-        return "(" + templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.js) + ")" + `/* ${fn.ts} */`;
+        return (
+            "(" +
+            templates.reduce((str, [name, value]) => str.replaceAll(`{{ ${name} }}`, value), fn.js) +
+            ")" +
+            `/* ${fn.ts} */`
+        );
     }
 
     public constructor(public readonly source: Parser.Struct[]) {}
@@ -144,7 +84,8 @@ export class Resolver {
 
         if (struct.type === "CONFIG") {
             return void struct.body.forEach(([option, value]) => {
-                if (option.type !== "IDENTIFIER") throw new SyntaxError(`Incorrect configuration syntax at ${option.line}:${option.col}.`);
+                if (option.type !== "IDENTIFIER")
+                    throw new SyntaxError(`Incorrect configuration syntax at ${option.line}:${option.col}.`);
 
                 if (!["NUMBER", "STRING", "BOOLEAN"].includes(value.type))
                     throw new SyntaxError(`Incorrect configuration syntax at ${option.line}:${option.col}.`);
@@ -194,7 +135,7 @@ export class Resolver {
                                 Object.assign(
                                     (v: any) =>
                                         binded.every((fn) => {
-                                            const e = fn(v[prop.value]);
+                                            const e = fn(v);
 
                                             if (e instanceof Error) throw e;
 
@@ -212,7 +153,7 @@ export class Resolver {
                                 Object.assign(
                                     (v: any) =>
                                         binded.every((fn) => {
-                                            const e = fn(v[prop.value]);
+                                            const e = fn(v);
 
                                             if (e instanceof Error) throw e;
 
@@ -268,7 +209,9 @@ export class Resolver {
                     {
                         properties,
                         ts: struct.name,
-                        js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
+                        js: `(v) => [${constraints
+                            .map((fn) => this.gen(struct.name, fn))
+                            .join(", ")}].every((fn) => wrap(fn(v)))`,
                         global: ``,
                     }
                 )
@@ -298,7 +241,7 @@ export class Resolver {
                                 Object.assign(
                                     (v: any) =>
                                         binded.every((fn) => {
-                                            const e = fn(v[prop.value]);
+                                            const e = fn(v);
 
                                             if (e instanceof Error) throw e;
 
@@ -316,7 +259,7 @@ export class Resolver {
                                 Object.assign(
                                     (v: any) =>
                                         binded.every((fn) => {
-                                            const e = fn(v[prop.value]);
+                                            const e = fn(v);
 
                                             if (e instanceof Error) throw e;
 
@@ -372,7 +315,9 @@ export class Resolver {
                     {
                         properties,
                         ts: struct.name,
-                        js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
+                        js: `(v) => [${constraints
+                            .map((fn) => this.gen(struct.name, fn))
+                            .join(", ")}].every((fn) => wrap(fn(v)))`,
                         global: ``,
                     }
                 )
@@ -396,7 +341,8 @@ export class Resolver {
         const binded = this.binded(token);
 
         if (body[0]?.type === "OPENING_PARENTHESES") {
-            if (!Resolver.isfactory(binded)) throw new ReferenceError(`Identifier is not a factory at ${token.line}:${token.col}.`);
+            if (!Resolver.isfactory(binded))
+                throw new ReferenceError(`Identifier is not a factory at ${token.line}:${token.col}.`);
 
             const tokens = [] as Tokenizer.Token[];
 
@@ -414,7 +360,10 @@ export class Resolver {
 
             const args = tokens.flatMap((token, i): (string | number | boolean | Constraint)[] => {
                 if (i % 2) {
-                    if (token.type !== "COMMA") throw new SyntaxError(`Expected comma at ${token.line}:${token.col}, instead got '${token.value}'.`);
+                    if (token.type !== "COMMA")
+                        throw new SyntaxError(
+                            `Expected comma at ${token.line}:${token.col}, instead got '${token.value}'.`
+                        );
 
                     return [];
                 }
@@ -422,7 +371,10 @@ export class Resolver {
                 if (token.type === "IDENTIFIER") {
                     const res = this.identifier(token, body);
 
-                    if (res.length > 2) throw new ReferenceError(`Cannot pass '${token.value}' as a parameter at ${token.line}:${token.col}.`);
+                    if (res.length > 2)
+                        throw new ReferenceError(
+                            `Cannot pass '${token.value}' as a parameter at ${token.line}:${token.col}.`
+                        );
 
                     return [res[0]];
                 }
@@ -431,9 +383,11 @@ export class Resolver {
             });
 
             return [binded(...args)];
-        } else if (body[0]?.type !== "IDENTIFIER" && body[0]) throw new SyntaxError(`Unexpected token '${token.value}' at ${token.line}:${token.col}.`);
+        } else if (body[0]?.type !== "IDENTIFIER" && body[0])
+            throw new SyntaxError(`Unexpected token '${token.value}' at ${token.line}:${token.col}.`);
         else {
-            if (Resolver.isfactory(binded)) throw new ReferenceError(`Factory wasn't called at ${token.line}:${token.col}.`);
+            if (Resolver.isfactory(binded))
+                throw new ReferenceError(`Factory wasn't called at ${token.line}:${token.col}.`);
 
             if (Array.isArray(binded)) return Object.assign(binded, { isAlias: true });
 
@@ -449,9 +403,11 @@ export class Resolver {
             Resolver.builtins.primitives.get(token.value) ??
             Resolver.builtins.factories.get(token.value);
 
-        if (!binded) throw new ReferenceError(`Identifier '${token.value}' does not exist at ${token.line}:${token.col}.`);
+        if (!binded)
+            throw new ReferenceError(`Identifier '${token.value}' does not exist at ${token.line}:${token.col}.`);
 
-        if (this.resolved.defs.has(token.value) || this.resolved.models.has(token.value)) return Object.assign(binded, { isStruct: true });
+        if (this.resolved.defs.has(token.value) || this.resolved.models.has(token.value))
+            return Object.assign(binded, { isStruct: true });
 
         return binded;
     }
