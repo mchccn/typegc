@@ -9,7 +9,7 @@ export class Resolver {
     public static loaded = false;
 
     public static async load() {
-        const files = await readdir(join(__dirname, "functions"));
+        const files = (await readdir(join(__dirname, "functions"))).filter((file) => file.split(".")[1] === "js");
 
         const functions = (
             await Promise.all(
