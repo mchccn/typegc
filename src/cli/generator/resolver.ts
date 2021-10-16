@@ -10,7 +10,7 @@ export class Resolver {
     public static loaded = false;
 
     public static async load() {
-        const files = (await readdir(join(__dirname, "functions"))).filter((file) => file.split(".")[1] !== ".d.ts");
+        const files = (await readdir(join(__dirname, "functions"))).filter((file) => !file.endsWith(".d.ts"));
 
         const functions = (await Promise.all(files.map((file) => import(join(__dirname, "functions", file)).then((file) => file.default as Factory)))).map(
             (fn) => Object.assign(fn, { isFactory: true })
