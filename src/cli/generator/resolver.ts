@@ -89,13 +89,28 @@ export class Resolver {
 
             const constraints = [] as Constraint[];
 
+            const dependencies = new Map<string, Constraint[]>();
+
             while (body.length) {
                 const token = body.shift()!;
 
-                if (token.type === "IDENTIFIER") constraints.push(...this.identifier(token, body));
+                if (token.type === "IDENTIFIER") {
+                    const [binded, deps] = this.identifier(token, body);
+
+                    deps.forEach(([key, dep]) => (!dependencies.has(key) ? dependencies.set(key, dep) : void 0));
+
+                    constraints.push(...binded);
+                }
             }
 
-            return void this.resolved.aliases.set(struct.name, constraints);
+            return void this.resolved.aliases.set(struct.name, [
+                Object.assign(constraints[0], {
+                    dependencies: [...dependencies.entries()].filter(
+                        ([key]) => !Resolver.builtins.factories.has(key) && !Resolver.builtins.primitives.has(key)
+                    ),
+                }),
+                ...constraints.slice(1),
+            ]);
         }
 
         if (struct.type === "DEFINE") {
@@ -105,16 +120,22 @@ export class Resolver {
 
             const properties = [] as [string, string][];
 
+            const dependencies = new Map<string, Constraint[]>();
+
             struct.body.forEach(([prop, ...tokens]) => {
                 const resolved = [] as Constraint[];
 
                 const body = [...tokens];
 
+                const propdeps = new Map<string, Constraint[]>();
+
                 while (body.length) {
                     const token = body.shift()!;
 
                     if (token.type === "IDENTIFIER") {
-                        const binded = this.identifier(token, body);
+                        const [binded, deps] = this.identifier(token, body);
+
+                        deps.forEach(([key, dep]) => (!propdeps.has(key) ? propdeps.set(key, dep) : void 0));
 
                         if (Resolver.isalias(binded))
                             resolved.push(
@@ -131,6 +152,7 @@ export class Resolver {
                                         ts: [...new Set(binded.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
                                         js: `(v) => alias$${token.value}.every((fn) => wrap(fn(v)))`,
                                         global: ``,
+                                        dependencies: deps,
                                     }
                                 )
                             );
@@ -151,110 +173,7 @@ export class Resolver {
                                             ? `def$${token.value}`
                                             : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
                                         global: ``,
-                                    }
-                                )
-                            );
-                        else resolved.push(...binded);
-                    }
-                }
-
-                constraints.push(
-                    Object.assign(
-                        (v: any) =>
-                            resolved.every((fn) => {
-                                const e = fn(v[prop.value]);
-
-                                if (e instanceof Error) throw e;
-
-                                return e;
-                            }),
-                        {
-                            ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
-                            js: `(v) => [${resolved
-                                .map((fn) => this.gen(`${struct.name}$${prop.value}`, fn))
-                                .join(", ")}].every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
-                            global: ``,
-                        }
-                    )
-                );
-
-                properties.push([prop.value, [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | ")]);
-            });
-
-            return void this.resolved.defs.set(
-                struct.name,
-                Object.assign(
-                    (v: any) =>
-                        constraints.every((fn) => {
-                            const e = fn(v);
-
-                            if (e instanceof Error) throw e;
-
-                            return e;
-                        }),
-                    {
-                        properties,
-                        ts: struct.name,
-                        js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
-                        global: ``,
-                    }
-                )
-            );
-        }
-
-        if (struct.type === "MODEL") {
-            if (this.exists(struct.name)) throw new ReferenceError(`Cannot redeclare identifier '${struct.name}'.`);
-
-            const constraints = [] as Constraint[];
-
-            const properties = [] as [string, string][];
-
-            struct.body.forEach(([prop, ...tokens]) => {
-                const resolved = [] as Constraint[];
-
-                const body = [...tokens];
-
-                while (body.length) {
-                    const token = body.shift()!;
-
-                    if (token.type === "IDENTIFIER") {
-                        const binded = this.identifier(token, body);
-
-                        if (Resolver.isalias(binded))
-                            resolved.push(
-                                Object.assign(
-                                    (v: any) =>
-                                        binded.every((fn) => {
-                                            const e = fn(v);
-
-                                            if (e instanceof Error) throw e;
-
-                                            return e;
-                                        }),
-                                    {
-                                        ts: [...new Set(binded.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
-                                        js: `(v) => alias$${token.value}.every((fn) => wrap(fn(v)))`,
-                                        global: ``,
-                                    }
-                                )
-                            );
-                        else if (Resolver.isstruct(binded[0]))
-                            resolved.push(
-                                Object.assign(
-                                    (v: any) =>
-                                        binded.every((fn) => {
-                                            const e = fn(v);
-
-                                            if (e instanceof Error) throw e;
-
-                                            return e;
-                                        }),
-                                    {
-                                        ts: token.value,
-                                        js: this.resolved.defs.has(token.value)
-                                            ? `def$${token.value}`
-                                            : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
-                                        global: ``,
+                                        dependencies: deps,
                                     }
                                 )
                             );
@@ -277,12 +196,133 @@ export class Resolver {
                         {
                             ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
                             js: `(v) => array$${struct.name}$${prop.value}${id}.every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
-                            global: `var array$${struct.name}$${prop.value}${id} = [${resolved
+                            global: `const array$${struct.name}$${prop.value}${id} = [${resolved
                                 .map((fn) => this.gen(`${struct.name}$${prop.value}`, fn))
                                 .join(", ")}]`,
+                            dependencies: [...propdeps.entries()],
                         }
                     )
                 );
+
+                [...propdeps.entries()].forEach(([key, dep]) => (!dependencies.has(key) ? dependencies.set(key, dep) : void 0));
+
+                properties.push([prop.value, [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | ")]);
+            });
+
+            return void this.resolved.defs.set(
+                struct.name,
+                Object.assign(
+                    (v: any) =>
+                        constraints.every((fn) => {
+                            const e = fn(v);
+
+                            if (e instanceof Error) throw e;
+
+                            return e;
+                        }),
+                    {
+                        properties,
+                        ts: struct.name,
+                        js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
+                        global: ``,
+                        dependencies: [...dependencies.entries()],
+                    }
+                )
+            );
+        }
+
+        if (struct.type === "MODEL") {
+            if (this.exists(struct.name)) throw new ReferenceError(`Cannot redeclare identifier '${struct.name}'.`);
+
+            const constraints = [] as Constraint[];
+
+            const properties = [] as [string, string][];
+
+            const dependencies = new Map<string, Constraint[]>();
+
+            struct.body.forEach(([prop, ...tokens]) => {
+                const resolved = [] as Constraint[];
+
+                const body = [...tokens];
+
+                const propdeps = new Map<string, Constraint[]>();
+
+                while (body.length) {
+                    const token = body.shift()!;
+
+                    if (token.type === "IDENTIFIER") {
+                        const [binded, deps] = this.identifier(token, body);
+
+                        deps.forEach(([key, dep]) => (!propdeps.has(key) ? propdeps.set(key, dep) : void 0));
+
+                        if (Resolver.isalias(binded))
+                            resolved.push(
+                                Object.assign(
+                                    (v: any) =>
+                                        binded.every((fn) => {
+                                            const e = fn(v);
+
+                                            if (e instanceof Error) throw e;
+
+                                            return e;
+                                        }),
+                                    {
+                                        ts: [...new Set(binded.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
+                                        js: `(v) => alias$${token.value}.every((fn) => wrap(fn(v)))`,
+                                        global: ``,
+                                        dependencies: deps,
+                                    }
+                                )
+                            );
+                        else if (Resolver.isstruct(binded[0]))
+                            resolved.push(
+                                Object.assign(
+                                    (v: any) =>
+                                        binded.every((fn) => {
+                                            const e = fn(v);
+
+                                            if (e instanceof Error) throw e;
+
+                                            return e;
+                                        }),
+                                    {
+                                        ts: token.value,
+                                        js: this.resolved.defs.has(token.value)
+                                            ? `def$${token.value}`
+                                            : `is${isSnakeCase(token.value) ? "_" : ""}${token.value}`,
+                                        global: ``,
+                                        dependencies: deps,
+                                    }
+                                )
+                            );
+                        else resolved.push(...binded);
+                    }
+                }
+
+                const id = uuid.next().value;
+
+                constraints.push(
+                    Object.assign(
+                        (v: any) =>
+                            resolved.every((fn) => {
+                                const e = fn(v[prop.value]);
+
+                                if (e instanceof Error) throw e;
+
+                                return e;
+                            }),
+                        {
+                            ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
+                            js: `(v) => array$${struct.name}$${prop.value}${id}.every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
+                            global: `const array$${struct.name}$${prop.value}${id} = [${resolved
+                                .map((fn) => this.gen(`${struct.name}$${prop.value}`, fn))
+                                .join(", ")}]`,
+                            dependencies: [...propdeps.entries()],
+                        }
+                    )
+                );
+
+                [...propdeps.entries()].forEach(([key, dep]) => (!dependencies.has(key) ? dependencies.set(key, dep) : void 0));
 
                 properties.push([prop.value, [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | ")]);
             });
@@ -303,6 +343,7 @@ export class Resolver {
                         ts: struct.name,
                         js: `(v) => [${constraints.map((fn) => this.gen(struct.name, fn)).join(", ")}].every((fn) => wrap(fn(v)))`,
                         global: ``,
+                        dependencies: [...dependencies.entries()],
                     }
                 )
             );
@@ -321,8 +362,13 @@ export class Resolver {
         return this.resolved;
     }
 
-    private identifier(token: Tokenizer.Token, body: Tokenizer.Token[]): Constraint[] {
+    private identifier(token: Tokenizer.Token, body: Tokenizer.Token[]): [Constraint[], [string, Constraint[]][]] {
         const binded = this.binded(token);
+
+        const dependencies = new Map<string, Constraint[]>();
+
+        if (this.resolved.aliases.has(token.value) || this.resolved.defs.has(token.value) || this.resolved.models.has(token.value))
+            dependencies.set(token.value, [binded as Constraint | Constraint[]].flat());
 
         if (body[0]?.type === "OPENING_PARENTHESES") {
             if (!Resolver.isfactory(binded)) throw new ReferenceError(`Identifier is not a factory at ${token.line}:${token.col}.`);
@@ -332,7 +378,7 @@ export class Resolver {
             let current = body.shift();
 
             while (current?.type !== "CLOSING_PARENTHESES") {
-                if (!current) throw new SyntaxError(`Unclosed `);
+                if (!current) throw new SyntaxError(`Unclosed parentheses at ${tokens[tokens.length - 1].line}:${tokens[tokens.length - 1].col}.`);
 
                 tokens.push(current);
 
@@ -349,9 +395,11 @@ export class Resolver {
                 }
 
                 if (token.type === "IDENTIFIER") {
-                    const res = this.identifier(token, body);
+                    const [res, deps] = this.identifier(token, body);
 
-                    if (res.length > 2) throw new ReferenceError(`Cannot pass '${token.value}' as a parameter at ${token.line}:${token.col}.`);
+                    if (res.length > 1) throw new ReferenceError(`Cannot pass '${token.value}' as a parameter at ${token.line}:${token.col}.`);
+
+                    deps.forEach(([key, dep]) => (!dependencies.has(key) ? dependencies.set(key, dep) : void 0));
 
                     return [res[0]];
                 }
@@ -359,14 +407,17 @@ export class Resolver {
                 return [Resolver.primitivify(token)];
             });
 
-            return [binded(...args)];
+            return [
+                [binded(...args)],
+                [...dependencies.entries()].filter(([key]) => !Resolver.builtins.factories.has(key) && !Resolver.builtins.primitives.has(key)),
+            ];
         } else if (body[0]?.type !== "IDENTIFIER" && body[0]) throw new SyntaxError(`Unexpected token '${token.value}' at ${token.line}:${token.col}.`);
         else {
             if (Resolver.isfactory(binded)) throw new ReferenceError(`Factory wasn't called at ${token.line}:${token.col}.`);
 
-            if (Array.isArray(binded)) return Object.assign(binded, { isAlias: true });
+            if (Array.isArray(binded)) return [Object.assign(binded, { isAlias: true }), [...dependencies.entries()]];
 
-            return [binded];
+            return [[binded], [...dependencies.entries()].filter(([key]) => !Resolver.builtins.factories.has(key) && !Resolver.builtins.primitives.has(key))];
         }
     }
 

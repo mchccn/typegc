@@ -207,24 +207,26 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
     it("resolves correctly", (done) => {
         const resolved = new Resolver(new Parser(new Tokenizer(schema).tokenize()).parse()).resolve();
 
+        console.log(Object.fromEntries(Object.entries(resolved.defs.get("ErrorObject")!)).dependencies);
+
         expect(resolved.config).to.deep.equal(new Map([["strict", true]]));
         expect(resolved.aliases.get("ErrorCode")).to.have.a.property("isAlias", true);
-        expect(Object.fromEntries(Object.entries(resolved.aliases.get("ErrorCode")![0]))).to.deep.equal({
+        expect(Object.fromEntries(Object.entries(resolved.aliases.get("ErrorCode")![0]).filter(([key]) => !["dependencies"].includes(key)))).to.deep.equal({
             ts: "string | number",
             js: '(v) => {\nif (599 <= 400) return new RangeError(`Stop parameter must be greater than the start parameter in the range factory.`);\n\nif (typeof v === "string") return v.length >= 400 && v.length <= 599;\n\nreturn v >= 400 && v <= 599;\n}',
             global: "",
         });
-        expect(Object.fromEntries(Object.entries(resolved.defs.get("ErrorObject")!))).to.deep.equal({
+        expect(Object.fromEntries(Object.entries(resolved.defs.get("ErrorObject")!).filter(([key]) => !["dependencies"].includes(key)))).to.deep.equal({
             properties: [
                 ["message", "string"],
                 ["stack", "string"],
             ],
             ts: "ErrorObject",
-            js: '(v) => [((v) => [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */].every((fn) => wrap(fn(v["message"]))))/* string */, ((v) => [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */].every((fn) => wrap(fn(v["stack"]))))/* string */].every((fn) => wrap(fn(v)))',
+            js: '(v) => [((v) => array$ErrorObject$message0.every((fn) => wrap(fn(v["message"]))))/* string */, ((v) => array$ErrorObject$stack1.every((fn) => wrap(fn(v["stack"]))))/* string */].every((fn) => wrap(fn(v)))',
             global: "",
             isStruct: true,
         });
-        expect(Object.fromEntries(Object.entries(resolved.models.get("APIError")!))).to.deep.equal({
+        expect(Object.fromEntries(Object.entries(resolved.models.get("APIError")!).filter(([key]) => !["dependencies"].includes(key)))).to.deep.equal({
             properties: [
                 ["status", "number | string"],
                 ["message", "string"],
@@ -236,7 +238,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
             global: "",
         });
         expect(resolved.globals).to.equal(
-            `\nvar APIError$endpoint2 = new RegExp("(/[^/]*)+");\nvar array$APIError$status0 = [((v) => alias$number.every((fn) => wrap(fn(v))))/* number */, ((v) => alias$ErrorCode.every((fn) => wrap(fn(v))))/* string | number */]\nvar array$APIError$message1 = [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */]\nvar array$APIError$endpoint3 = [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */, ((v) => APIError$endpoint2.test(v))/* string */]\nvar array$APIError$error4 = [(def$ErrorObject)/* ErrorObject */]`
+            `\nconst array$ErrorObject$message0 = [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */]\nconst array$ErrorObject$stack1 = [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */]\nconst APIError$endpoint4 = new RegExp("(/[^/]*)+");\nconst array$APIError$status2 = [((v) => alias$number.every((fn) => wrap(fn(v))))/* number */, ((v) => alias$ErrorCode.every((fn) => wrap(fn(v))))/* string | number */]\nconst array$APIError$message3 = [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */]\nconst array$APIError$endpoint5 = [((v) => alias$string.every((fn) => wrap(fn(v))))/* string */, ((v) => APIError$endpoint4.test(v))/* string */]\nconst array$APIError$error6 = [(def$ErrorObject)/* ErrorObject */]`
         );
 
         return done();
@@ -355,7 +357,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
 
         console.log(prettier.format(code, { parser: "babel" }));
 
-        const isAPIError = eval(code.replace(/export var isAPIError = /, ""));
+        const isAPIError = eval(code.replace(/export const isAPIError = /, ""));
 
         expect(isAPIError({})).to.be.false;
         expect(

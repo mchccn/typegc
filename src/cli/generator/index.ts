@@ -47,7 +47,7 @@ const wrap = (e) => {
  * aliases
  */
 ${[...resolved.aliases.entries()]
-    .map(([name, alias]) => `var alias$${name} = [${alias.map((fn) => resolver.gen(`alias$${name}`, fn)).join(", ")}];`)
+    .map(([name, alias]) => `const alias$${name} = [${alias.map((fn) => resolver.gen(`alias$${name}`, fn)).join(", ")}];`)
     .join("\n")}
 
 /**
@@ -56,7 +56,11 @@ ${[...resolved.aliases.entries()]
 ${[...resolved.defs.entries()]
     .map(
         ([name, def]) => `\
-var def$${name} = ${def.js};
+const def$${name} = ((${def.dependencies.map(([dep]) => `retrieve$${dep}`).join(", ")}) => {
+    ${def.dependencies.map(([dep]) => `let cached$${dep};\nconst ${dep} = () => cached$${dep} ?? (cached$${dep} = retrieve$${dep}());`).join("\n")}
+
+    return ${def.js};
+})(${def.dependencies.map(([dep]) => `() => ${dep}`).join(", ")});
 `
     )
     .join("\n")}
@@ -66,7 +70,11 @@ var def$${name} = ${def.js};
 ${[...resolved.models.entries()]
     .map(
         ([name, model]) => `\
-export var is${isSnakeCase(name) ? "_" : ""}${name} = ${model.js};
+const is${isSnakeCase(name) ? "_" : ""}${name} = ((${model.dependencies.map(([dep]) => `retrieve$${dep}`).join(", ")}) => {
+    ${model.dependencies.map(([dep]) => `let cached$${dep};\nconst ${dep} = () => cached$${dep} ?? (cached$${dep} = retrieve$${dep}());`).join("\n")}
+
+    return ${model.js};
+})(${model.dependencies.map(([dep]) => `() => ${dep}`).join(", ")});
 `
     )
     .join("\n")}

@@ -2,13 +2,9 @@ export default (start: number, stop?: number, step?: number) => {
     return Object.assign(
         (v: number | string) => {
             if (typeof start === "number" && typeof stop === "number" && typeof step === "number") {
-                if (typeof v === "string")
-                    return new RangeError(`String values cannot use the step parameter for the range factory.`);
+                if (typeof v === "string") return new RangeError(`String values cannot use the step parameter for the range factory.`);
 
-                if (stop <= start)
-                    return new RangeError(
-                        `Stop parameter must be greater than the start parameter in the range factory.`
-                    );
+                if (stop <= start) return new RangeError(`Stop parameter must be greater than the start parameter in the range factory.`);
 
                 if (step <= 0) return new RangeError(`Step parameter for the range factory must be positive.`);
 
@@ -16,10 +12,7 @@ export default (start: number, stop?: number, step?: number) => {
             }
 
             if (typeof start === "number" && typeof stop === "number") {
-                if (stop <= start)
-                    return new RangeError(
-                        `Stop parameter must be greater than the start parameter in the range factory.`
-                    );
+                if (stop <= start) return new RangeError(`Stop parameter must be greater than the start parameter in the range factory.`);
 
                 if (typeof v === "string") return v.length >= start && v.length <= stop;
 
@@ -28,8 +21,7 @@ export default (start: number, stop?: number, step?: number) => {
 
             if (typeof start === "number") {
                 if (start < 0) {
-                    if (typeof v === "string")
-                        throw new RangeError(`String values cannot use a negative end parameter in the range factory.`);
+                    if (typeof v === "string") throw new RangeError(`String values cannot use a negative end parameter in the range factory.`);
 
                     return v >= start;
                 }
