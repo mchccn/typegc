@@ -1,15 +1,18 @@
 import chalk from "chalk";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import yargs from "yargs";
 import { helpmsg } from "./constants";
+import { format } from "./format";
 import { Resolver } from "./generator/resolver";
 import { exists } from "./utils/exists";
 
 export default async function index() {
     if (process.argv.length === 2) return console.log(helpmsg);
 
-    yargs
+    await Resolver.load();
+
+    await yargs
         .help(false)
         .command(
             "help",
@@ -70,10 +73,40 @@ config {
         .command(
             "format",
             "",
-            (yargs) => yargs,
-            async (args) => {}
+            (yargs) =>
+                yargs
+                    .option("source", {
+                        type: "string",
+                        alias: "s",
+                        description: `relative path to typegc schema to format`,
+                        default: join(process.cwd(), "typegc", "schema.typegc"),
+                    })
+                    .option("encoding", {
+                        type: "string",
+                        alias: "e",
+                        description: `typegc schema file encoding`,
+                        choices: ["ascii", "utf8", "utf-8", "utf16le", "ucs2", "ucs-2", "base64", "base64url", "latin1", "binary", "hex"],
+                        default: "utf8",
+                    }),
+            async (args) => {
+                const schema = await readFile(args.source, args.encoding as BufferEncoding);
+
+                const start = Date.now();
+
+                const formatted = format(schema);
+
+                if (formatted instanceof Error) {
+                    console.log(chalk.red(`Encountered error while formatting:`), formatted);
+
+                    return process.exit(1);
+                }
+
+                await writeFile(args.source, formatted, args.encoding as BufferEncoding);
+
+                return console.log(chalk.blue(`Done in ${Date.now() - start}ms ✨!`));
+            }
         )
         .parse();
 
-    await Resolver.load();
+    return process.exit(0);
 }

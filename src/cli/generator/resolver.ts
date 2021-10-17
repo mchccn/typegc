@@ -23,7 +23,7 @@ export class Resolver {
         return (this.loaded = true);
     }
 
-    private structs = this.source;
+    private structs = [...this.source.map((struct) => ({ ...struct }))];
 
     public static readonly builtins = {
         factories: new Map<string, Factory>(),
