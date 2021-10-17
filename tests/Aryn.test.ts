@@ -242,56 +242,8 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
     });
 
     it("generates correctly", (done) => {
-        expect(new Generator(schema).generate()[1]).to.deep.equal(
-            "\n" +
-                "/**\n" +
-                " * typegc - Type Guard Compiler\n" +
-                " * \n" +
-                " * version 1.0.0\n" +
-                " * \n" +
-                " * AUTO-GENERATED FILE DO NOT EDIT DIRECTLY\n" +
-                " */\n" +
-                "\n" +
-                "/**\n" +
-                " * config\n" +
-                " * {\n" +
-                ' *     "strict": true\n' +
-                " * }\n" +
-                " */\n" +
-                "\n" +
-                "/**\n" +
-                " * type aliases\n" +
-                " */\n" +
-                "type string = string;\n" +
-                "type number = number;\n" +
-                "type boolean = boolean;\n" +
-                "type bigint = bigint;\n" +
-                "type symbol = symbol;\n" +
-                "type ErrorCode = string | number;\n" +
-                "\n" +
-                "/**\n" +
-                " * interfaces\n" +
-                " */\n" +
-                "interface ErrorObject {\n" +
-                "    message: string;\n" +
-                "    stack: string;\n" +
-                "}\n" +
-                "\n" +
-                "/**\n" +
-                " * exported interfaces\n" +
-                " */\n" +
-                "export interface APIError {\n" +
-                "    status: number | string;\n" +
-                "    message: string;\n" +
-                "    endpoint: string;\n" +
-                "    error: ErrorObject;\n" +
-                "}\n" +
-                "\n" +
-                "/**\n" +
-                " * type guards\n" +
-                " */\n" +
-                "export declare const isAPIError: (v: unknown) => v is APIError;\n" +
-                "\n"
+        expect(new Generator(schema).generate()[1]).to.equal(
+            `/**\n * typegc - Type Guard Compiler\n * \n * version 1.0.0\n * \n * AUTO-GENERATED FILE DO NOT EDIT DIRECTLY\n */\n\n/**\n * config\n * {\n *     "strict": true\n * }\n */\n\n/**\n * type aliases\n */\ntype string = string;\ntype number = number;\ntype boolean = boolean;\ntype bigint = bigint;\ntype symbol = symbol;\ntype ErrorCode = string | number;\n\n/**\n * interfaces\n */\ninterface ErrorObject {\n    message: string;\n    stack: string;\n}\n\n/**\n * exported interfaces\n */\nexport interface APIError {\n    status: number | string;\n    message: string;\n    endpoint: string;\n    error: ErrorObject;\n}\n\n/**\n * type guards\n */\nexport declare const isAPIError: (v: unknown) => v is APIError;\n\n`
         );
 
         return done();

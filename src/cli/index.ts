@@ -1,14 +1,18 @@
 import chalk from "chalk";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
+import prettier from "prettier";
 import yargs from "yargs";
 import { helpmsg } from "./constants";
 import { format } from "./format";
+import { Generator } from "./generator/index";
 import { Resolver } from "./generator/resolver";
 import { exists } from "./utils/exists";
 
 export default async function index() {
     if (process.argv.length === 2) return console.log(helpmsg);
+
+    const prettierconfig = (await prettier.resolveConfig(process.cwd(), { editorconfig: true })) ?? {};
 
     await Resolver.load();
 
@@ -54,14 +58,57 @@ config {
             "generate",
             "",
             (yargs) =>
-                yargs.option("source", {
-                    type: "string",
-                    alias: "s",
-                    description: `target typegc schema's relative path`,
-                    default: join(process.cwd(), "typegc", "schema.typegc"),
-                }),
+                yargs
+                    .option("source", {
+                        type: "string",
+                        alias: "s",
+                        description: `target typegc schema's relative path`,
+                        default: join(process.cwd(), "typegc", "schema.typegc"),
+                    })
+                    .option("encoding", {
+                        type: "string",
+                        alias: "e",
+                        description: `typegc schema file encoding`,
+                        choices: ["ascii", "utf8", "utf-8", "utf16le", "ucs2", "ucs-2", "base64", "base64url", "latin1", "binary", "hex"],
+                        default: "utf8",
+                    }),
             async (args) => {
-                console.log(`NOT IMPLEMENTED YET`);
+                const schema = await readFile(args.source, args.encoding as BufferEncoding);
+
+                const [js, dts] = new Generator(schema).generate();
+
+                if (!(await exists(join(process.cwd(), "node_modules", ".typegc")))) await mkdir(join(process.cwd(), "node_modules", ".typegc"));
+
+                const now = Date.now();
+
+                await writeFile(
+                    join(process.cwd(), "node_modules", ".typegc", "index.js"),
+                    prettier.format(js, { ...prettierconfig, parser: "babel" }),
+                    args.encoding as BufferEncoding
+                );
+
+                await writeFile(
+                    join(process.cwd(), "node_modules", ".typegc", "index.d.ts"),
+                    prettier.format(dts, { ...prettierconfig, parser: "typescript" }),
+                    args.encoding as BufferEncoding
+                );
+
+                await writeFile(
+                    join(process.cwd(), "node_modules", ".typegc", "package.json"),
+                    prettier.format(
+                        JSON.stringify({
+                            name: ".typegc",
+                            version: "1.0.0",
+                            description: "Pragmatic, configurable, and maintainable user-defined type guards, using a Prisma-like schema.",
+                            main: "index.js",
+                            typings: "index.d.ts",
+                        }),
+                        { ...prettierconfig, parser: "json" }
+                    ),
+                    args.encoding as BufferEncoding
+                );
+
+                console.log(chalk.blue(`Done in ${Date.now() - now}ms ✨!`));
             }
         )
         .command(

@@ -16,7 +16,7 @@ export class Generator {
         const resolved = resolver.resolve();
 
         return [
-            `
+            `\
 /**
  * typegc - Type Guard Compiler
  * 
@@ -54,11 +54,7 @@ ${[...resolved.aliases.entries()].map(([name, alias]) => `const ${name} = [${ali
 ${[...resolved.defs.entries()]
     .map(
         ([name, def]) => `\
-const ${name} = ((${def.dependencies.map(([dep]) => `retrieve$${dep}`).join(", ")}) => {
-    ${def.dependencies.map(([dep]) => `let cached$${dep};\nconst ${dep} = () => cached$${dep} ?? (cached$${dep} = retrieve$${dep}());`).join("\n")}
-
-    return ${def.js};
-})(${def.dependencies.map(([dep]) => `() => ${dep}`).join(", ")});
+const ${name} = ${def.js};
 `
     )
     .join("\n")}
@@ -68,16 +64,12 @@ const ${name} = ((${def.dependencies.map(([dep]) => `retrieve$${dep}`).join(", "
 ${[...resolved.models.entries()]
     .map(
         ([name, model]) => `\
-export const is${isSnakeCase(name) ? "_" : ""}${name} = ((${model.dependencies.map(([dep]) => `retrieve$${dep}`).join(", ")}) => {
-    ${model.dependencies.map(([dep]) => `let cached$${dep};\nconst ${dep} = () => cached$${dep} ?? (cached$${dep} = retrieve$${dep}());`).join("\n")}
-
-    return ${model.js};
-})(${model.dependencies.map(([dep]) => `() => ${dep}`).join(", ")});
+export const is${isSnakeCase(name) ? "_" : ""}${name} = ${model.js};
 `
     )
     .join("\n")}
 `,
-            `
+            `\
 /**
  * typegc - Type Guard Compiler
  * 
