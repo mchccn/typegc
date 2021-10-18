@@ -34,24 +34,21 @@ ${JSON.stringify(Object.fromEntries([...resolved.config.entries()]), undefined, 
     .join("\n")}
  */
 
-const wrap = (e) => {
-    if (e instanceof Error) throw e;
-
-    return e;
-};
-
 /**
  * globals
- */${[...new Set(resolved.globals.split("\n"))].join("\n")}
+ */
+var _;${[...new Set(resolved.globals.split("\n"))].join("\n")}
 
 /**
  * aliases
  */
+var _;
 ${[...resolved.aliases.entries()].map(([name, alias]) => `const ${name} = [${alias.map((fn) => resolver.gen(name, fn)).join(", ")}];`).join("\n")}
 
 /**
  * definitions
  */
+var _;
 ${[...resolved.defs.entries()]
     .map(
         ([name, def]) => `\
@@ -62,6 +59,7 @@ const ${name} = ${def.js};
 /**
  * models
  */
+var _;
 ${[...resolved.models.entries()]
     .map(
         ([name, model]) => `\
@@ -90,6 +88,7 @@ ${JSON.stringify(Object.fromEntries([...resolved.config.entries()]), undefined, 
 /**
  * type aliases
  */
+declare var _;
 ${[...resolved.aliases.entries()]
     .map(
         ([name, alias]) => `\
@@ -101,6 +100,7 @@ type ${name} = ${[...new Set(alias.flatMap((fn) => fn.ts.split(" | ")))].join(" 
 /**
  * interfaces
  */
+ declare var _;
 ${[...resolved.defs.entries()]
     .map(
         ([name, model]) => `\
@@ -113,6 +113,7 @@ ${model.properties.map(([prop, type]) => `    ${prop}: ${type};`).join("\n")}
 /**
  * exported interfaces
  */
+declare var _;
 ${[...resolved.models.entries()]
     .map(
         ([name, model]) => `\
@@ -125,6 +126,7 @@ ${model.properties.map(([prop, type]) => `    ${prop}: ${type};`).join("\n")}
 /**
  * type guards
  */
+declare var _;
 ${[...resolved.models.entries()]
     .map(
         ([name, model]) => `\

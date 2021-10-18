@@ -64,7 +64,7 @@ config {
                         type: "string",
                         alias: "s",
                         description: `target typegc schema's relative path`,
-                        default: join(process.cwd(), "typegc", "schema.typegc"),
+                        default: join("typegc", "schema.typegc"),
                     })
                     .option("encoding", {
                         type: "string",
@@ -74,7 +74,7 @@ config {
                         default: "utf8",
                     }),
             async (args) => {
-                const schema = await readFile(args.source, args.encoding as BufferEncoding);
+                const schema = await readFile(join(process.cwd(), args.source), args.encoding as BufferEncoding);
 
                 const [js, dts] = new Generator(schema).generate();
 
@@ -127,7 +127,7 @@ config {
                         type: "string",
                         alias: "s",
                         description: `relative path to typegc schema to format`,
-                        default: join(process.cwd(), "typegc", "schema.typegc"),
+                        default: join("typegc", "schema.typegc"),
                     })
                     .option("encoding", {
                         type: "string",
@@ -137,7 +137,7 @@ config {
                         default: "utf8",
                     }),
             async (args) => {
-                const schema = await readFile(args.source, args.encoding as BufferEncoding);
+                const schema = await readFile(join(process.cwd(), args.source), args.encoding as BufferEncoding);
 
                 const start = Date.now();
 
@@ -149,7 +149,7 @@ config {
                     return process.exit(1);
                 }
 
-                await writeFile(args.source, formatted, args.encoding as BufferEncoding);
+                await writeFile(join(process.cwd(), args.source), formatted, args.encoding as BufferEncoding);
 
                 return console.log(chalk.blue(`Done in ${Date.now() - start}ms ✨!`));
             }

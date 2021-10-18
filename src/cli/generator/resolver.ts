@@ -150,7 +150,7 @@ export class Resolver {
                                         }),
                                     {
                                         ts: [...new Set(binded.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
-                                        js: `(v) => ${token.value}().every((fn) => wrap(fn(v)))`,
+                                        js: `(v) => ${token.value}().every((fn) => fn(v))`,
                                         global: ``,
                                         dependencies: deps,
                                     }
@@ -193,10 +193,12 @@ export class Resolver {
                             }),
                         {
                             ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
-                            js: `(v) => array$${struct.name}$${prop.value}${id}.every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
+                            js: `(v) => array$${struct.name}$${prop.value}${id}.every((fn) => fn(v["${prop.value.replaceAll('"', '\\"')}"]))`,
                             global: `const array$${struct.name}$${prop.value}${id} = ((${[...propdeps.entries()]
                                 .map(([dep]) => `retrieve$${dep}`)
-                                .join(", ")}) => { return [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}] })(${[
+                                .join(", ")}) => { ${[...propdeps.entries()]
+                                .map(([dep]) => `let cached$${dep}; const ${dep} = () => cached$${dep} ?? (cached$${dep} = retrieve$${dep}());`)
+                                .join(" ")} return [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}] })(${[
                                 ...propdeps.entries(),
                             ]
                                 .map(([dep]) => `() => ${dep}`)
@@ -229,7 +231,7 @@ export class Resolver {
                     {
                         properties,
                         ts: struct.name,
-                        js: `(v) => mainArray$${struct.name}.every((fn) => wrap(fn(v)))`,
+                        js: `(v) => mainArray$${struct.name}.every((fn) => fn(v))`,
                         global: ``,
                         dependencies: [...dependencies.entries()],
                     }
@@ -274,7 +276,7 @@ export class Resolver {
                                         }),
                                     {
                                         ts: [...new Set(binded.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
-                                        js: `(v) => ${token.value}().every((fn) => wrap(fn(v)))`,
+                                        js: `(v) => ${token.value}().every((fn) => fn(v))`,
                                         global: ``,
                                         dependencies: deps,
                                     }
@@ -317,16 +319,17 @@ export class Resolver {
                             }),
                         {
                             ts: [...new Set(resolved.flatMap((fn) => fn.ts.split(" | ")))].join(" | "),
-                            js: `(v) => array$${struct.name}$${prop.value}${id}.every((fn) => wrap(fn(v["${prop.value.replaceAll('"', '\\"')}"])))`,
+                            js: `(v) => array$${struct.name}$${prop.value}${id}.every((fn) => fn(v["${prop.value.replaceAll('"', '\\"')}"]))`,
                             global: `const array$${struct.name}$${prop.value}${id} = ((${[...propdeps.entries()]
                                 .map(([dep]) => `retrieve$${dep}`)
                                 .join(", ")}) => { ${[...propdeps.entries()]
-                                .map(([dep]) => `let cached$${dep};\nconst ${dep} = () => cached$${dep} ?? (cached$${dep} = retrieve$${dep}());`)
-                                .join("\n")} return [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}] })(${[
+                                .map(([dep]) => `let cached$${dep}; const ${dep} = () => cached$${dep} ?? (cached$${dep} = retrieve$${dep}());`)
+                                .join(" ")} return [${resolved.map((fn) => this.gen(`${struct.name}$${prop.value}`, fn)).join(", ")}] })(${[
                                 ...propdeps.entries(),
                             ]
                                 .map(([dep]) => `() => ${dep}`)
                                 .join(", ")});`,
+
                             dependencies: [...propdeps.entries()],
                         }
                     )
@@ -355,7 +358,7 @@ export class Resolver {
                     {
                         properties,
                         ts: struct.name,
-                        js: `(v) => mainArray$${struct.name}.every((fn) => wrap(fn(v)))`,
+                        js: `(v) => mainArray$${struct.name}.every((fn) => fn(v))`,
                         global: ``,
                         dependencies: [...dependencies.entries()],
                     }
