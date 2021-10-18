@@ -1,3 +1,4 @@
+import { version } from "../utils/version";
 import { Parser } from "./parser";
 import { Resolver } from "./resolver";
 import { Tokenizer } from "./tokenizer";
@@ -20,7 +21,7 @@ export class Generator {
 /**
  * typegc - Type Guard Compiler
  * 
- * version 1.0.0
+ * version ${version()}
  * 
  * AUTO-GENERATED FILE DO NOT EDIT DIRECTLY
  */
@@ -73,7 +74,7 @@ export const is${isSnakeCase(name) ? "_" : ""}${name} = ${model.js};
 /**
  * typegc - Type Guard Compiler
  * 
- * version 1.0.0
+ * version ${version()}
  * 
  * AUTO-GENERATED FILE DO NOT EDIT DIRECTLY
  */

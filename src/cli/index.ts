@@ -8,6 +8,7 @@ import { format } from "./format";
 import { Generator } from "./generator/index";
 import { Resolver } from "./generator/resolver";
 import { exists } from "./utils/exists";
+import { version } from "./utils/version";
 
 export default async function index() {
     if (process.argv.length === 2) return console.log(helpmsg);
@@ -42,7 +43,7 @@ export default async function index() {
                         `\
 config {
     strict  true
-    version "1.0.0"
+    version "${version()}"
 }
                 `
                     );
@@ -98,7 +99,7 @@ config {
                     prettier.format(
                         JSON.stringify({
                             name: ".typegc",
-                            version: "1.0.0",
+                            version: version(),
                             description: "Pragmatic, configurable, and maintainable user-defined type guards, using a Prisma-like schema.",
                             main: "index.js",
                             typings: "index.d.ts",
