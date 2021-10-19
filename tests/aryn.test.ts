@@ -243,7 +243,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
 
     it("generates correctly", (done) => {
         expect(new Generator(schema).generate()[1]).to.equal(
-            `/**\n * typegc - Type Guard Compiler\n * \n * version 1.0.0\n * \n * AUTO-GENERATED FILE DO NOT EDIT DIRECTLY\n */\n\n/**\n * config\n * {\n *     "strict": true\n * }\n */\n\n/**\n * type aliases\n */\ndeclare var _: never;\ntype string = string;\ntype number = number;\ntype boolean = boolean;\ntype bigint = bigint;\ntype symbol = symbol;\ntype ErrorCode = string | number;\n\n/**\n * interfaces\n */\n declare var _: never;\ninterface ErrorObject {\n    message: string;\n    stack: string;\n}\n\n/**\n * exported interfaces\n */\ndeclare var _: never;\nexport interface APIError {\n    status: number | string;\n    message: string;\n    endpoint: string;\n    error: ErrorObject;\n}\n\n/**\n * type guards\n */\ndeclare var _: never;\nexport declare const isAPIError: (v: unknown) => v is APIError;\n\n`
+            `/**\n * typegc - Type Guard Compiler\n * \n * version 1.0.0\n * \n * AUTO-GENERATED FILE DO NOT EDIT DIRECTLY\n */\n\n/**\n * config\n * {\n *     "strict": true\n * }\n */\n\n/**\n * type aliases\n */\ndeclare var _: never;\n\n\n\n\n\ntype ErrorCode = string | number;\n\n/**\n * interfaces\n */\n declare var _: never;\ninterface ErrorObject {\n    message: string;\n    stack: string;\n}\n\n/**\n * exported interfaces\n */\ndeclare var _: never;\nexport interface APIError {\n    status: number | string;\n    message: string;\n    endpoint: string;\n    error: ErrorObject;\n}\n\n/**\n * type guards\n */\ndeclare var _: never;\nexport declare const isAPIError: (v: unknown) => v is APIError;\n\n`
         );
 
         return done();
