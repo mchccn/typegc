@@ -1,0 +1,11 @@
+repo:
+    - ./*
+
+tests:
+    - ./tests/*
+
+docs:
+    - ./docs/**/*
+
+src:
+    - ./src/**/*
