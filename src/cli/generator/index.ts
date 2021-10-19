@@ -88,10 +88,12 @@ ${JSON.stringify(Object.fromEntries([...resolved.config.entries()]), undefined, 
 /**
  * type aliases
  */
-declare var _;
+declare var _: never;
 ${[...resolved.aliases.entries()]
-    .map(
-        ([name, alias]) => `\
+    .map(([name, alias]) =>
+        Resolver.builtins.primitives.has(name)
+            ? ""
+            : `\
 type ${name} = ${[...new Set(alias.flatMap((fn) => fn.ts.split(" | ")))].join(" | ")};\
 `
     )
@@ -100,7 +102,7 @@ type ${name} = ${[...new Set(alias.flatMap((fn) => fn.ts.split(" | ")))].join(" 
 /**
  * interfaces
  */
- declare var _;
+ declare var _: never;
 ${[...resolved.defs.entries()]
     .map(
         ([name, model]) => `\
@@ -113,7 +115,7 @@ ${model.properties.map(([prop, type]) => `    ${prop}: ${type};`).join("\n")}
 /**
  * exported interfaces
  */
-declare var _;
+declare var _: never;
 ${[...resolved.models.entries()]
     .map(
         ([name, model]) => `\
@@ -126,7 +128,7 @@ ${model.properties.map(([prop, type]) => `    ${prop}: ${type};`).join("\n")}
 /**
  * type guards
  */
-declare var _;
+declare var _: never;
 ${[...resolved.models.entries()]
     .map(
         ([name, model]) => `\
