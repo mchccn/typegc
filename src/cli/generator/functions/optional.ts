@@ -8,7 +8,7 @@ export default (fn: Constraint) => {
 
   const id = uuid.next().value;
 
-  return (Object.assign((v: unknown) => fn(v) || typeof v === "undefined", {
+  return Object.assign((v: unknown) => fn(v) || typeof v === "undefined", {
     ts: `${fn.ts} | undefined`,
     js: `(v) => {{ name }}${id}()(v) || typeof v === "undefined"`,
     global: ``, // ! like the generator, use cached getters
