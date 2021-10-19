@@ -1,8 +1,8 @@
+import { isSnakeCase } from "../utils/isSnakeCase";
 import { version } from "../utils/version";
 import { Parser } from "./parser";
 import { Resolver } from "./resolver";
 import { Tokenizer } from "./tokenizer";
-import { isSnakeCase } from "./utils";
 
 export class Generator {
     constructor(public readonly schema: string) {}
