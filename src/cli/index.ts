@@ -19,6 +19,8 @@ export default async function index() {
 
     await yargs
         .help(false)
+        .strict()
+        .fail(() => console.log(helpmsg))
         .command(
             "help",
             "",
@@ -116,7 +118,9 @@ config {
             "plugin",
             "",
             (yargs) => yargs,
-            async (args) => {}
+            async (args) => {
+                console.log(chalk.yellow(`Sorry, this feature is coming in the next major version. Stay tuned!`));
+            }
         )
         .command(
             "format",

@@ -13,4 +13,9 @@ ${chalk.bold("Commands")}
     generate    generate type guards from schema
       plugin    manage third-party plugins
       format    prettify schema
+
+${chalk.bold("Options")}
+
+    ${chalk.dim("--")}source   ${chalk.dim("-")}s    schema file to target
+    ${chalk.dim("--")}encoding ${chalk.dim("-")}e    file encoding
 `;
