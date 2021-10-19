@@ -4,7 +4,7 @@
 
 > TypeGC is a small TypeScript tool that allows you, as a developer, to have a more productive experience by writing useful and meaningful code, not wasting time on writing boring repetitive type guards.
 
-<small>Looking for the [documentation](<[https://](https://cursorsdottsx.github.io/typegc/)>)?</small>
+<small>Looking for the <a href="https://cursorsdottsx.github.io/typegc/">documentation</a>?</small>
 
 ## Getting started
 
