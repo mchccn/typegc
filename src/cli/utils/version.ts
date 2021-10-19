@@ -6,7 +6,5 @@ let cachedversion = "";
 export function version() {
     if (cachedversion) return cachedversion;
 
-    cachedversion = JSON.parse(readFileSync(join(__dirname, "..", "..", "..", "package.json"), "utf8")).version;
-
-    return cachedversion;
+    return (cachedversion = JSON.parse(readFileSync(join(__dirname, "..", "..", "..", "package.json"), "utf8")).version);
 }
