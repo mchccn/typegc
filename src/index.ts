@@ -1,6 +1,8 @@
 //@ts-nocheck
 
-import * as typegc from ".typegc";
+import * as guards from ".typegc";
+import { interpret as typegc } from "./interpret";
 
 export * from ".typegc";
-export default typegc;
+
+export default Object.assign(typegc, guards);
