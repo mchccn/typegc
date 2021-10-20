@@ -373,6 +373,20 @@ export declare const isAPIError: (v: unknown) => v is APIError;
 ```
 
   </details>
+    
+## More features
+    
+There's more about TypeGC in case you missed it:
+    
+- Standard library of factories
+- Import user-defined components
+- Plugin system for extensibility
+- Fast compilation and interpreting
+
+**Performance benchmarks (nanoseconds on example code and schema earlier)**
+- Manual: 138ns
+- TypeGC (interpreted): 413ns
+- TypeGC (compiled): 237ns
 
 ## When should I use it?
 
