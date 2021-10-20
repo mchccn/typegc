@@ -4,7 +4,7 @@
 
 > TypeGC is a small TypeScript tool that allows you, as a developer, to have a more productive experience by writing useful and meaningful code, not wasting time on writing boring repetitive type guards.
 
-<small>Looking for the <a href="https://cursorsdottsx.github.io/typegc/">documentation</a>?</small>
+<small>Looking for the <a href="https://cursorsdottsx.github.io/typegc/docs/">documentation</a>?</small>
 
 ## Getting started
 
@@ -34,7 +34,7 @@ $ typegc init
 ```
 
 Now go to `typegc/schema.typegc` and start creating your first schema!
-Refer to the [documentation](https://cursorsdottsx.github.io/typegc/) anytime you get stuck, or for a complete reference of the syntax and standard library.
+Refer to the [documentation](https://cursorsdottsx.github.io/typegc/docs/) anytime you get stuck, or for a complete reference of the syntax and standard library.
 
 After you hack together a schema, compile it with `typegc generate`!
 
@@ -384,9 +384,10 @@ There's more about TypeGC in case you missed it:
 - Fast compilation and interpreting
 
 **Performance benchmarks (nanoseconds on example code and schema earlier)**
-- Manual: 138ns
-- TypeGC (interpreted): 413ns
-- TypeGC (compiled): 237ns
+
+-   Manual: 138ns
+-   TypeGC (interpreted): 413ns
+-   TypeGC (compiled): 237ns
 
 ## When should I use it?
 
