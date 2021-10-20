@@ -10,9 +10,9 @@ import { Resolver } from "./generator/resolver";
 import { exists } from "./utils/exists";
 import { version } from "./utils/version";
 
-if (process.env.TYPEGC_EXEC_TYPE !== "cli") throw new Error("Do not import the CLI when using TypeGC in your application.");
-
 export default async function index() {
+    if (process.env.TYPEGC_EXEC_TYPE !== "cli") throw new Error("Do not execute CLI when using TypeGC in your application.");
+
     if (process.argv.length === 2) return console.log(helpmsg);
 
     const prettierconfig = (await prettier.resolveConfig(process.cwd(), { editorconfig: true })) ?? {};
@@ -22,7 +22,7 @@ export default async function index() {
     await yargs
         .help(false)
         .strict()
-        .fail(() => console.log(helpmsg))
+        .fail((_, err) => (err ? void 0 : console.log(helpmsg)))
         .command(
             "help",
             "",

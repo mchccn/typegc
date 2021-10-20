@@ -37,7 +37,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
     before(() => Resolver.load());
 
     it("tokenizes correctly", (done) => {
-        expect(new Tokenizer(schema).tokenize()).to.deep.equal([
+        expect(new Tokenizer(schema).tokenize().filter((token) => token.type !== "COMMENT")).to.deep.equal([
             { type: "NEWLINE", value: "\n", line: 1, col: 1 },
             { type: "WHITESPACE", value: "    ", line: 2, col: 1 },
             { type: "CONFIG", value: "config", line: 2, col: 5 },

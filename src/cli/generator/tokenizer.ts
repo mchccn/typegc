@@ -15,7 +15,8 @@ export namespace Tokenizer {
             | "CLOSING_BRACKET"
             | "OPENING_PARENTHESES"
             | "CLOSING_PARENTHESES"
-            | "COMMA";
+            | "COMMA"
+            | "COMMENT";
         value: string;
         line: number;
         col: number;
@@ -44,7 +45,7 @@ export class Tokenizer {
                 {
                     type: "NEWLINE",
                     regex: /^(\n+)/,
-                    expect: ["CONFIG", "ALIAS", "DEFINE", "MODEL", "IDENTIFIER", "CLOSING_BRACKET", "WHITESPACE"],
+                    expect: ["CONFIG", "ALIAS", "DEFINE", "MODEL", "IDENTIFIER", "CLOSING_BRACKET", "WHITESPACE", "COMMENT"],
                 },
                 {
                     type: "WHITESPACE",
@@ -62,6 +63,7 @@ export class Tokenizer {
                         "NEWLINE",
                         "CLOSING_BRACKET",
                         "OPENING_BRACKET",
+                        "COMMENT",
                     ],
                 },
                 {
@@ -87,7 +89,7 @@ export class Tokenizer {
                 {
                     type: "IDENTIFIER",
                     regex: /^([_$a-zA-Z\xA0-\uFFFF][_$a-zA-Z0-9\xA0-\uFFFF]*)/,
-                    expect: ["COMMA", "NEWLINE", "WHITESPACE", "OPENING_PARENTHESES"],
+                    expect: ["COMMA", "NEWLINE", "WHITESPACE", "OPENING_PARENTHESES", "COMMENT"],
                 },
                 {
                     type: "NUMBER",
@@ -107,12 +109,12 @@ export class Tokenizer {
                 {
                     type: "OPENING_BRACKET",
                     regex: /^(\{)/,
-                    expect: ["NEWLINE", "WHITESPACE"],
+                    expect: ["NEWLINE", "WHITESPACE", "COMMENT"],
                 },
                 {
                     type: "CLOSING_BRACKET",
                     regex: /^(\})/,
-                    expect: ["NEWLINE", "WHITESPACE"],
+                    expect: ["NEWLINE", "WHITESPACE", "COMMENT"],
                 },
                 {
                     type: "OPENING_PARENTHESES",
@@ -122,12 +124,17 @@ export class Tokenizer {
                 {
                     type: "CLOSING_PARENTHESES",
                     regex: /^(\))/,
-                    expect: ["IDENTIFIER", "WHITESPACE", "NEWLINE"],
+                    expect: ["IDENTIFIER", "WHITESPACE", "NEWLINE", "COMMENT"],
                 },
                 {
                     type: "COMMA",
                     regex: /^(,)/,
                     expect: ["IDENTIFIER", "NUMBER", "STRING", "BOOLEAN", "WHITESPACE"],
+                },
+                {
+                    type: "COMMENT",
+                    regex: /^(#(.*))$/m,
+                    expect: ["WHITESPACE", "NEWLINE"],
                 },
             ] as Tokenizer.Pattern[]
         ).map((pattern) => [pattern.type, pattern])

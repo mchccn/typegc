@@ -171,6 +171,8 @@ export class Parser {
             });
         }
 
+        if (token.type === "COMMENT") return;
+
         if (token.type !== "NEWLINE") throw new Error(`Token type not handled properly: '${token.type}'.`);
 
         return;
