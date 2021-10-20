@@ -144,6 +144,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
                         { type: "BOOLEAN", value: "true", line: 3, col: 14 },
                     ],
                 ],
+                comments: "",
             },
             {
                 type: "ALIAS",
@@ -156,6 +157,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
                     { type: "NUMBER", value: "599", line: 6, col: 32 },
                     { type: "CLOSING_PARENTHESES", value: ")", line: 6, col: 35 },
                 ],
+                comments: "",
             },
             {
                 type: "DEFINE",
@@ -170,6 +172,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
                         { type: "IDENTIFIER", value: "string", line: 10, col: 15 },
                     ],
                 ],
+                comments: "",
             },
             {
                 type: "MODEL",
@@ -197,6 +200,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
                         { type: "IDENTIFIER", value: "ErrorObject", line: 17, col: 16 },
                     ],
                 ],
+                comments: "",
             },
         ]);
 
@@ -209,11 +213,13 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
         expect(resolved.config).to.deep.equal(new Map([["strict", true]]));
         expect(resolved.aliases.get("ErrorCode")).to.have.a.property("isAlias", true);
         expect(Object.fromEntries(Object.entries(resolved.aliases.get("ErrorCode")![0]).filter(([key]) => !["dependencies"].includes(key)))).to.deep.equal({
+            comments: "",
             ts: "string | number",
             js: '(v) => {\nif (599 <= 400) return new RangeError(`Stop parameter must be greater than the start parameter in the range factory.`);\n\nif (typeof v === "string") return v.length >= 400 && v.length <= 599;\n\nreturn v >= 400 && v <= 599;\n}',
             global: "",
         });
         expect(Object.fromEntries(Object.entries(resolved.defs.get("ErrorObject")!).filter(([key]) => !["dependencies"].includes(key)))).to.deep.equal({
+            comments: "",
             properties: [
                 ["message", "string"],
                 ["stack", "string"],
@@ -224,6 +230,7 @@ describe(`${TEST_TYPES.BEHAVIOUR} Aryn's original request`, () => {
             isStruct: true,
         });
         expect(Object.fromEntries(Object.entries(resolved.models.get("APIError")!).filter(([key]) => !["dependencies"].includes(key)))).to.deep.equal({
+            comments: "",
             properties: [
                 ["status", "number | string"],
                 ["message", "string"],
