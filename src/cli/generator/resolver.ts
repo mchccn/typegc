@@ -1,9 +1,9 @@
-import { isSnakeCase } from "../utils/isSnakeCase";
 import { readdir } from "fs/promises";
 import { join } from "path";
-import { Parser } from "./parser";
-import { Tokenizer } from "./tokenizer";
-import { Constraint, Factory } from "./types";
+import { isSnakeCase } from "../utils/isSnakeCase";
+import type { Parser } from "./parser";
+import type { Tokenizer } from "./tokenizer";
+import type { Constraint, Factory } from "./types";
 import { uuid } from "./uuid";
 
 export class Resolver {
