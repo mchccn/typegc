@@ -43,7 +43,20 @@ var _;${[...new Set(resolved.globals.split("\n"))].join("\n")}
  * aliases
  */
 var _;
-${[...resolved.aliases.entries()].map(([name, alias]) => `const ${name} = [${alias.map((fn) => resolver.gen(name, fn)).join(", ")}];`).join("\n")}
+${[...resolved.aliases.entries()]
+    .map(
+        ([name, alias]) => `\
+/**
+${
+    alias[0].comments
+        ?.split("\n")
+        .map((line) => ` * ${line}`)
+        .join("\n") || ` *`
+}
+ */
+const ${name} = [${alias.map((fn) => resolver.gen(name, fn)).join(", ")}];`
+    )
+    .join("\n")}
 
 /**
  * definitions
@@ -52,6 +65,14 @@ var _;
 ${[...resolved.defs.entries()]
     .map(
         ([name, def]) => `\
+/**
+${
+    def.comments
+        .split("\n")
+        .map((line) => ` * ${line}`)
+        .join("\n") || ` *`
+}
+ */
 const ${name} = ${def.js};
 `
     )
@@ -63,6 +84,14 @@ var _;
 ${[...resolved.models.entries()]
     .map(
         ([name, model]) => `\
+/**
+${
+    model.comments
+        .split("\n")
+        .map((line) => ` * ${line}`)
+        .join("\n") || ` *`
+}
+ */
 export const is${isSnakeCase(name) ? "_" : ""}${name} = ${model.js};
 `
     )

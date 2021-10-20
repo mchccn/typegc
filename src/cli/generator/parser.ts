@@ -6,15 +6,18 @@ export namespace Parser {
               type: "DEFINE" | "MODEL";
               name: string;
               body: Tokenizer.Token[][];
+              comments: string;
           }
         | {
               type: "ALIAS";
               name: string;
               body: Tokenizer.Token[];
+              comments: string;
           }
         | {
               type: "CONFIG";
               body: Tokenizer.Token[][];
+              comments: string;
           };
 }
 
@@ -22,6 +25,8 @@ export class Parser {
     private tokens = this.source.filter((token) => token.type !== "WHITESPACE");
 
     private readonly structs = [] as Parser.Struct[];
+
+    private comments = "";
 
     public constructor(public readonly source: Tokenizer.Token[]) {
         {
@@ -92,7 +97,9 @@ export class Parser {
 
             body.splice(0, 1);
 
-            return this.structs.push({ type: "CONFIG", body });
+            this.structs.push({ type: "CONFIG", body, comments: this.comments });
+
+            return (this.comments = "");
         }
 
         if (token.type === "ALIAS") {
@@ -103,16 +110,21 @@ export class Parser {
             while (current?.type !== "NEWLINE") {
                 if (!current) throw new SyntaxError(`Unexpected end of input.`);
 
-                body.push(current);
+                if (current.type === "COMMENT") {
+                    this.comments += (this.comments ? "\n" : "") + current.value.slice(1).trim();
+                } else body.push(current);
 
                 current = this.tokens.shift();
             }
 
-            return this.structs.push({
+            this.structs.push({
                 type: "ALIAS",
                 name: body[0].value,
                 body: body.slice(1),
+                comments: this.comments,
             });
+
+            return (this.comments = "");
         }
 
         if (token.type === "DEFINE") {
@@ -125,7 +137,12 @@ export class Parser {
             while (current?.type !== "CLOSING_BRACKET") {
                 if (!current) throw new SyntaxError(`Unexpected end of input.`);
 
-                if (current.type === "NEWLINE") {
+                if (current.type === "COMMENT") {
+                    this.comments +=
+                        (this.comments ? "\n" : "") +
+                        (body[body.length - 1]?.[0] ? `- ${body[body.length - 1][0].value} : ` : "") +
+                        current.value.slice(1).trim();
+                } else if (current.type === "NEWLINE") {
                     if (line.length < 2) throw new SyntaxError(`Property does not have any constraints at ${line[0].line}:${line[0].col}.`);
 
                     body.push(line);
@@ -136,11 +153,14 @@ export class Parser {
                 current = this.tokens.shift();
             }
 
-            return this.structs.push({
+            this.structs.push({
                 type: "DEFINE",
                 name: body[0][0].value,
                 body: body.slice(1),
+                comments: this.comments,
             });
+
+            return (this.comments = "");
         }
 
         if (token.type === "MODEL") {
@@ -153,7 +173,12 @@ export class Parser {
             while (current?.type !== "CLOSING_BRACKET") {
                 if (!current) throw new SyntaxError(`Unexpected end of input.`);
 
-                if (current.type === "NEWLINE") {
+                if (current.type === "COMMENT") {
+                    this.comments +=
+                        (this.comments ? "\n" : "") +
+                        (body[body.length - 1]?.[0] ? `- ${body[body.length - 1][0].value} : ` : "") +
+                        current.value.slice(1).trim();
+                } else if (current.type === "NEWLINE") {
                     if (line.length < 2) throw new SyntaxError(`Property does not have any constraints at ${line[0].line}:${line[0].col}.`);
 
                     body.push(line);
@@ -164,14 +189,21 @@ export class Parser {
                 current = this.tokens.shift();
             }
 
-            return this.structs.push({
+            this.structs.push({
                 type: "MODEL",
                 name: body[0][0].value,
                 body: body.slice(1),
+                comments: this.comments,
             });
+
+            return (this.comments = "");
         }
 
-        if (token.type === "COMMENT") return;
+        if (token.type === "COMMENT") {
+            this.comments += (this.comments ? "\n" : "") + token.value.slice(1).trim();
+
+            return;
+        }
 
         if (token.type !== "NEWLINE") throw new Error(`Token type not handled properly: '${token.type}'.`);
 

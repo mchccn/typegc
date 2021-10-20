@@ -40,11 +40,11 @@ export class Resolver {
 
     private readonly resolved = {
         config: new Map<string, string | number | boolean>(),
-        aliases: new Map<string, Constraint[]>([
+        aliases: new Map<string, (Constraint & { comments?: string })[]>([
             ...[...Resolver.builtins.primitives].map(([key, constraint]) => [key, [constraint]] as [string, Constraint[]]),
         ]),
-        defs: new Map<string, Constraint & { properties: [string, string][] }>(),
-        models: new Map<string, Constraint & { properties: [string, string][] }>(),
+        defs: new Map<string, Constraint & { properties: [string, string][]; comments: string }>(),
+        models: new Map<string, Constraint & { properties: [string, string][]; comments: string }>(),
         globals: ``,
     };
 
@@ -108,6 +108,7 @@ export class Resolver {
                     dependencies: [...dependencies.entries()].filter(
                         ([key]) => !Resolver.builtins.factories.has(key) && !Resolver.builtins.primitives.has(key)
                     ),
+                    comments: struct.comments,
                 }),
                 ...constraints.slice(1),
             ]);
@@ -234,6 +235,7 @@ export class Resolver {
                         js: `(v) => mainArray$${struct.name}.every((fn) => fn(v))`,
                         global: ``,
                         dependencies: [...dependencies.entries()],
+                        comments: struct.comments,
                     }
                 )
             );
@@ -361,6 +363,7 @@ export class Resolver {
                         js: `(v) => mainArray$${struct.name}.every((fn) => fn(v))`,
                         global: ``,
                         dependencies: [...dependencies.entries()],
+                        comments: struct.comments,
                     }
                 )
             );
