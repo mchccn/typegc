@@ -5,4 +5,5 @@ assets/
 docs/
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
+tsconfig.build.json
 tsconfig.json
