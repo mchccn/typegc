@@ -8,8 +8,8 @@
     },
     "scripts": {
         "watch": "tsc -w",
-        "test": "chokidar \"tests/**/*.ts\" -c \"env TS_NODE_PROJECT='./tsconfig.json' mocha -r ts-node/register -r tsconfig-paths/register 'tests/**/*.ts'\"",
-        "test:once": "env TS_NODE_PROJECT='./tsconfig.json' mocha -r ts-node/register -r tsconfig-paths/register 'tests/**/*.ts'",
+        "typegc:test": "chokidar \"packages/typegc/tests/**/*.ts\" -c \"env TS_NODE_PROJECT='./tsconfig.json' mocha -r ts-node/register -r tsconfig-paths/register 'packages/typegc/tests/**/*.ts'\"",
+        "typegc:test:once": "env TS_NODE_PROJECT='./tsconfig.json' mocha -r ts-node/register -r tsconfig-paths/register 'packages/typegc/tests/**/*.ts'",
         "build": "tsc",
         "format": "prettier --write ."
     },
