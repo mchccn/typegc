@@ -1,0 +1,51 @@
+{
+    "name": "typegc",
+    "version": "1.0.0",
+    "description": "Pragmatic, configurable, and maintainable user-defined type guards, using a Prisma-like schema.",
+    "main": "dist/index.js",
+    "bin": {
+        "typegc": "dist/cli/bin.js"
+    },
+    "scripts": {
+        "watch": "tsc -w",
+        "test": "chokidar \"tests/**/*.ts\" -c \"env TS_NODE_PROJECT='./tsconfig.json' mocha -r ts-node/register -r tsconfig-paths/register 'tests/**/*.ts'\"",
+        "test:once": "env TS_NODE_PROJECT='./tsconfig.json' mocha -r ts-node/register -r tsconfig-paths/register 'tests/**/*.ts'",
+        "build": "tsc",
+        "format": "prettier --write ."
+    },
+    "keywords": [
+        "typegc",
+        "typescript",
+        "type guards",
+        "typescript tool"
+    ],
+    "author": "cursorsdottsx <cursors.dev@gmail.com>",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/chai": "^4.2.22",
+        "@types/mocha": "^9.0.0",
+        "@types/node": "^16.11.0",
+        "@types/prettier": "^2.4.1",
+        "@types/yargs": "^17.0.4",
+        "chai": "^4.3.4",
+        "chokidar-cli": "^3.0.0",
+        "mocha": "^9.1.3",
+        "ts-node": "^10.3.0",
+        "tsconfig-paths": "^3.11.0",
+        "typescript": "^4.4.4"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/cursorsdottsx/typegc.git"
+    },
+    "bugs": {
+        "url": "https://github.com/cursorsdottsx/typegc/issues"
+    },
+    "homepage": "https://github.com/cursorsdottsx/typegc#readme",
+    "dependencies": {
+        "chalk": "^4.1.2",
+        "prettier": "^2.4.1",
+        "tslib": "^2.3.1",
+        "yargs": "^17.2.1"
+    }
+}
