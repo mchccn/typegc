@@ -5,7 +5,12 @@ import { Resolver } from "./resolver";
 import { Tokenizer } from "./tokenizer";
 
 export class Generator {
-    constructor(public readonly schema: string) {}
+    constructor(
+        public readonly schema: string,
+        public readonly options?: {
+            module?: string;
+        }
+    ) {}
 
     public generate() {
         const tokens = new Tokenizer(this.schema).tokenize();
@@ -15,6 +20,8 @@ export class Generator {
         const resolver = new Resolver(structs);
 
         const resolved = resolver.resolve();
+
+        // ! Check compiler options here! If `module` is set to commonjs, output cjs, otherwise, output esm
 
         return [
             `\

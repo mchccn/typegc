@@ -11,7 +11,7 @@ import { exists } from "./utils/exists";
 import { version } from "./utils/version";
 
 export default async function index() {
-    if (process.env.TYPEGC_EXEC_TYPE !== "cli") throw new Error("Do not execute CLI when using TypeGC in your application.");
+    if (process.env.TYPEGC_EXEC_TYPE !== "cli") throw new Error("Do not execute the CLI when using TypeGC in your application.");
 
     if (process.argv.length === 2) return console.log(helpmsg);
 
@@ -37,6 +37,14 @@ export default async function index() {
                 if (!(await exists(join(process.cwd(), "package.json")))) {
                     console.log(chalk.red(`File package.json not found.`));
                     process.exit(0);
+                }
+
+                try {
+                    const pkg = JSON.parse(await readFile(join(process.cwd(), "package.json"), "utf8"));
+
+                    if (!pkg["devDependencies"]?.["typescript"]) console.log(chalk.red(`TypeScript is not a dev dependency of this project.`));
+                } catch {
+                    console.log(chalk.red(`Failed to parse package.json.`));
                 }
 
                 if (!(await exists(join(process.cwd(), "typegc")))) await mkdir(join(process.cwd(), "typegc"));
@@ -80,7 +88,17 @@ config {
             async (args) => {
                 const schema = await readFile(join(process.cwd(), args.source), args.encoding as BufferEncoding);
 
-                const [js, dts] = new Generator(schema).generate();
+                const tsconfig = await (async () => {
+                    try {
+                        return JSON.parse(await readFile(join(process.cwd(), "tsconfig.json"), "utf8"));
+                    } catch {
+                        console.log(chalk.red(`Failed to parse tsconfig.json`));
+
+                        return undefined;
+                    }
+                })();
+
+                const [js, dts] = new Generator(schema, tsconfig?.compilerOptions).generate();
 
                 if (!(await exists(join(process.cwd(), "node_modules", ".typegc")))) await mkdir(join(process.cwd(), "node_modules", ".typegc"));
 
