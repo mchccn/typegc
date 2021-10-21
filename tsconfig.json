@@ -3,8 +3,10 @@
     "compilerOptions": {
         "baseUrl": ".",
         "paths": {
-            "typegc/*": ["src/typegc/*"],
-            "@typegc/plugin/*": ["packages/plugin/*"]
+            "typegc/*": ["packages/typegc/src/*"],
+            "@typegc/plugin/*": ["packages/plugin/src/*"]
         }
-    }
+    },
+    "include": ["**/*"],
+    "exclude": ["**/dist", "**/build", "**/node_modules"]
 }
