@@ -123,7 +123,7 @@ function manual(v: any): v is APIError {
 
 </details>
 
-Agh! What a nightmare to maintain! The documentation and implementations will all differ across developers and platforms!
+Agh! What a nightmare to maintain! And to think, you'd probably have to make even *more*...
 
 Fortunately, there is something we can do to minimize the amount of ambiguity involved, which is obviously a single source of truth.
 In TypeGC, our single source of truth, is of course the schema.
@@ -382,6 +382,7 @@ There's more about TypeGC in case you missed it:
 - Import user-defined components
 - Plugin system for extensibility
 - Fast compilation and interpreting
+- Respects your snake case conventions
 
 **Performance benchmarks (nanoseconds on example code and schema earlier)**
 
@@ -422,3 +423,8 @@ I'd like to say a few words about contributing.
 -   [Aryn](https://github.com/arynxd/) - cocreator of TypeGC, in a way
 -   [Cassie](https://github.com/BobobUnicorn/) - great insight, feedback and design solutions
 -   ~~[Okku](https://github.com/0kku) - memey posts on discord~~
+    
+### Problems
+
+-   Compiled JavaScript has useless if statements that add extra needless operations hindering its performance
+-   Better output types; need a way to narrow down output types instead of being more generic
