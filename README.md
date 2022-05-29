@@ -1,3 +1,5 @@
+## Deprecated in favor of @kelsny/lumberjack
+
 ![Banner](./assets/typegc.png)
 
 ---
